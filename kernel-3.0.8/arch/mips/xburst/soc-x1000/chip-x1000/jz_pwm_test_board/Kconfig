@@ -1,0 +1,18 @@
+choice
+prompt "BOARD version"
+depends on PRODUCT_X1000_JZ_PWM_TEST_BOARD
+default BOARD_X1000_JZ_PWM_TEST_BOARD_V10
+
+config BOARD_X1000_JZ_PWM_TEST_BOARD_V10
+bool "board x1000 jz_pwm_test_board v10"
+depends on PRODUCT_X1000_JZ_PWM_TEST_BOARD
+
+endchoice
+
+config BOARD_NAME
+string
+default "jz_pwm_test_board_v10" if BOARD_X1000_JZ_PWM_TEST_BOARD_V10
+
+
+
+

@@ -1,0 +1,34 @@
+choice
+prompt "BOARD version"
+depends on PRODUCT_X1000_NW5061_MAINBOARD
+default BOARD_X1000_NW5061_MAINBOARD_V10
+
+config BOARD_X1000_NW5061_MAINBOARD_V10
+bool "board x1000 nw5061 mainboard v10"
+depends on PRODUCT_X1000_NW5061_MAINBOARD
+
+
+config BOARD_X1000_NW5027
+bool "board x1000 canna v22"
+depends on PRODUCT_X1000_NW5061_MAINBOARD
+
+config BOARD_X1000_LB
+bool "board x1000 lb"
+depends on PRODUCT_X1000_NW5061_MAINBOARD
+endchoice
+
+config BOARD_NAME
+string
+default "nw5061_mainboard_v10" if BOARD_X1000_NW5061_MAINBOARD_V10
+
+
+config BOARD_NAME
+string
+default "nw5027" if BOARD_X1000_NW5027
+
+
+config BOARD_NAME
+string
+default "lb" if BOARD_X1000_LB
+
+
