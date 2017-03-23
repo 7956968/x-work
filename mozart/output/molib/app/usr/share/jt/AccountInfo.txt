@@ -1,0 +1,8 @@
+﻿#应用程序序号
+appKey=bd5d5405
+#开发者密钥
+developerKey=5d8a3482994cc46560fe117344d14e19
+#灵云云服务的接口地址
+cloudUrl=api.hcicloud.com:8888
+#需要运行的灵云能力
+capKey=asr.cloud.dialog;asr.local.wake;asr.local.doa;asr.local.vqe

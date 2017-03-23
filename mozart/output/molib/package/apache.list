@@ -1,0 +1,17 @@
+output/molib/updater
+output/molib/updater/usr
+output/molib/updater/usr/lib
+output/molib/updater/usr/lib/libapr-1.so.0
+output/molib/updater/usr/lib/libapr-1.so.0.5.1
+output/molib/updater/usr/lib/libaprutil-1.so.0
+output/molib/updater/usr/lib/libaprutil-1.so.0.5.3
+output/molib/updater/usr/lib/libpcre.so
+output/molib/updater/usr/lib/libpcre.so.1
+output/molib/updater/usr/lib/libpcre.so.1.2.3
+output/molib/updater/usr/lib/libpcreposix.so.0
+output/molib/updater/usr/lib/libpcreposix.so.0.0.2
+output/molib/updater/usr/lib/libexpat.so.0
+output/molib/updater/usr/lib/libexpat.so.0.5.0
+output/molib/updater/usr/lib/libexpat.so
+output/molib/updater/usr/bin/httpd
+output/molib/updater/usr/modules/httpd.exp

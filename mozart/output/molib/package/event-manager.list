@@ -1,0 +1,7 @@
+output/molib/updater/usr/sbin
+output/molib/updater/usr/sbin/event_manager
+output/molib/updater/usr/include/event_interface.h
+output/molib/updater/usr/lib/libevent.so
+output/molib/updater/etc
+output/molib/updater/etc/init.d
+output/molib/updater/etc/init.d/S01event.sh

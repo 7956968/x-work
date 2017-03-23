@@ -1,0 +1,7 @@
+output/molib/app
+output/molib/app/usr
+output/molib/app/usr/sbin
+output/molib/app/usr/sbin/adbd
+output/molib/app/etc
+output/molib/app/etc/init.d
+output/molib/app/etc/init.d/S99adbd.sh

@@ -1,0 +1,7 @@
+output/molib/app/usr/sbin
+output/molib/app/usr/sbin/alarm_manager
+output/molib/app/usr/include/alarm_interface.h
+output/molib/app/usr/lib/libalarm.so
+output/molib/app/etc
+output/molib/app/etc/init.d
+output/molib/app/etc/init.d/S01alarm.sh

@@ -13,4 +13,3 @@ cscope.*
 *.stamp_host_installed
 
 node_modules/
-src/vr

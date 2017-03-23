@@ -1,0 +1,9 @@
+output/molib/app/usr/include/jansson_config.h
+output/molib/app/usr/include/jansson.h
+output/molib/app/usr/lib/libjansson.so.4.9.0
+output/molib/app/usr/lib/libjansson.so
+output/molib/app/usr/lib/libjansson.a
+output/molib/app/usr/lib/libjansson.so.4
+output/molib/app/usr/lib/libjansson.la
+output/molib/app/usr/lib/pkgconfig
+output/molib/app/usr/lib/pkgconfig/jansson.pc

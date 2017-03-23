@@ -1,0 +1,5 @@
+output/molib/app/usr/include/webrtc_aec.h
+output/molib/app/usr/lib/libwebrtc_audio_processing.so.0.0.0
+output/molib/app/usr/lib/libwebrtc.so
+output/molib/app/usr/lib/libwebrtc_audio_processing.so.0
+output/molib/app/usr/lib/libwebrtc_audio_processing.so

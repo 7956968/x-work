@@ -1,0 +1,10 @@
+output/molib/updater/usr/include/player_ipc_interface.h
+output/molib/updater/usr/include/player_interface.h
+output/molib/updater/usr/bin
+output/molib/updater/usr/bin/player
+output/molib/updater/usr/lib/libplayer.so
+output/molib/updater/usr/data
+output/molib/updater/usr/data/player.ini
+output/molib/updater/etc
+output/molib/updater/etc/init.d
+output/molib/updater/etc/init.d/S03player.sh

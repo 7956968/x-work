@@ -1,0 +1,10 @@
+output/molib/app/usr/include/vr-atalk_interface.h
+output/molib/app/usr/lib/libvr_atalk.so
+output/molib/app/usr/lib/librecognizer.so
+output/molib/app/usr/lib/libvoicesender_dynamic.so
+output/molib/app/usr/lib/libvad.so
+output/molib/app/usr/lib/libopus.so
+output/molib/app/usr/lib/libwebsockets.so
+output/molib/app/etc
+output/molib/app/etc/atalk
+output/molib/app/etc/atalk/sdk-config.json

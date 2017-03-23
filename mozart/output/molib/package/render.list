@@ -1,0 +1,11 @@
+output/molib/app/usr/test
+output/molib/app/usr/share
+output/molib/app/usr/share/render
+output/molib/app/usr/share/render/RenderingControl.xml
+output/molib/app/usr/share/render/QPlay.xml
+output/molib/app/usr/share/render/AVTransport.xml
+output/molib/app/usr/share/render/qplayauth.ini
+output/molib/app/usr/share/render/ConnectionManager.xml
+output/molib/app/usr/include/render_interface.h
+output/molib/app/usr/lib/librender.so
+output/molib/app/usr/data

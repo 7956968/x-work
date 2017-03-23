@@ -1,0 +1,12 @@
+output/molib/app/usr/share
+output/molib/app/usr/share/jt
+output/molib/app/usr/share/jt/hci_micarray.ini
+output/molib/app/usr/share/jt/wake_decoder.conf
+output/molib/app/usr/share/jt/ispk_wake.dat
+output/molib/app/usr/include/libwakeup_jietong_interface.h
+output/molib/app/usr/include/hci_ut.h
+output/molib/app/usr/include/hci_micarray.h
+output/molib/app/usr/include/hci_sys.h
+output/molib/app/usr/lib/libhci_micarray.so
+output/molib/app/usr/lib/libiSpeakWakeDNNLite.so
+output/molib/app/usr/lib/libwakeup_jietong.so

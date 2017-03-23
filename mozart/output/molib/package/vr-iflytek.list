@@ -1,0 +1,4 @@
+output/molib/app/usr/include/vr-iflytek_interface.h
+output/molib/app/usr/bin
+output/molib/app/usr/lib/libvr_iflytek.so
+output/molib/app/usr/lib/libmsc.so

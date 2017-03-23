@@ -1,0 +1,11 @@
+output/molib/updater/usr/sbin
+output/molib/updater/usr/sbin/network_manager
+output/molib/updater/usr/sbin/startap.sh
+output/molib/updater/usr/sbin/startsta.sh
+output/molib/updater/usr/include/wifi_interface.h
+output/molib/updater/usr/lib/libwifi.so
+output/molib/updater/usr/lib/libbroadcom_api.so
+output/molib/updater/usr/lib/libwpa.so
+output/molib/updater/etc
+output/molib/updater/etc/init.d
+output/molib/updater/etc/init.d/S02network.sh

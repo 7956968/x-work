@@ -1,0 +1,5 @@
+output/molib/app/usr/test
+output/molib/app/usr/include/bluetooth_interface.h
+output/molib/app/usr/bin
+output/molib/app/usr/lib/libbt.so
+output/molib/app/usr/lib/libappcommon.so

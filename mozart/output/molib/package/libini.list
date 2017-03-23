@@ -1,0 +1,5 @@
+output/molib/updater/usr/include/ini_interface.h
+output/molib/updater/usr/bin
+output/molib/updater/usr/lib/libini.a
+output/molib/updater/usr/lib/libini_x86.a
+output/molib/updater/usr/lib/libini.so

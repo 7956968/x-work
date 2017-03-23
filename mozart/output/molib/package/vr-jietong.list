@@ -1,0 +1,9 @@
+output/molib/app/usr/share
+output/molib/app/usr/share/jt
+output/molib/app/usr/share/jt/AccountInfo.txt
+output/molib/app/usr/include/vr-jietong_interface.h
+output/molib/app/usr/lib/libhci_sys.so
+output/molib/app/usr/lib/libhci_curl.so
+output/molib/app/usr/lib/libvr_jietong.so
+output/molib/app/usr/lib/libhci_asr_cloud_recog.so
+output/molib/app/usr/lib/libhci_asr.so

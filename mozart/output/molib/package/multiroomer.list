@@ -1,0 +1,8 @@
+output/molib/app/usr/include/mulroom_interface.h
+output/molib/app/usr/include/mulroom_jsonkey.h
+output/molib/app/usr/bin
+output/molib/app/usr/bin/mulroom
+output/molib/app/usr/lib/libmulroom.so
+output/molib/app/etc
+output/molib/app/etc/init.d
+output/molib/app/etc/init.d/S06mulroom.sh

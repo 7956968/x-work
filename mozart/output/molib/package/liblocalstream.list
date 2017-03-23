@@ -1,0 +1,4 @@
+output/molib/app/usr/include/localstream_fmt.h
+output/molib/app/usr/include/localstream_interface.h
+output/molib/app/usr/lib/liblocalstream.a
+output/molib/app/usr/lib/liblocalstream.so

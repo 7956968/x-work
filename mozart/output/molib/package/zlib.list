@@ -1,0 +1,12 @@
+output/molib/updater/usr/share
+output/molib/updater/usr/share/man
+output/molib/updater/usr/share/man/man3
+output/molib/updater/usr/share/man/man3/zlib.3
+output/molib/updater/usr/include/zconf.h
+output/molib/updater/usr/include/zlib.h
+output/molib/updater/usr/lib/libz.a
+output/molib/updater/usr/lib/libz.so
+output/molib/updater/usr/lib/libz.so.1.2.8
+output/molib/updater/usr/lib/pkgconfig
+output/molib/updater/usr/lib/pkgconfig/zlib.pc
+output/molib/updater/usr/lib/libz.so.1

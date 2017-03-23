@@ -1,0 +1,4 @@
+output/molib/app/usr/include/tts_jietong_interface.h
+output/molib/app/usr/lib/libhci_tts.so
+output/molib/app/usr/lib/libhci_tts_cloud_synth.so
+output/molib/app/usr/lib/libtts_jietong.so

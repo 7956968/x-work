@@ -1,0 +1,6 @@
+output/molib/updater/usr/share
+output/molib/updater/usr/share/man
+output/molib/updater/usr/share/man/man8
+output/molib/updater/usr/share/man/man8/iw.8.gz
+output/molib/updater/usr/sbin
+output/molib/updater/usr/sbin/iw
