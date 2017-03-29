@@ -10,7 +10,7 @@
 #include "mozart_ui.h"
 #include "mozart_musicplayer.h"
 #include "modules/mozart_module_cloud_music.h"
-
+#include "dm6291_led.h"
 #if(SUPPORT_SONG_SUPPLYER == SONG_SUPPLYER_XIMALAYA)
 #include "song_supplyer/ximalaya.h"
 #endif
@@ -81,7 +81,7 @@ int mozart_module_cloud_music_startup(void)
 	sprintf(buf, "欢迎回来，为您播放%s的歌", artists[idx]);
 	mozart_tts(buf);
 	mozart_tts_wait();
-
+	led_mode_on(MUSICPLAYER_DOMAIN);
 #if (SUPPORT_SONG_SUPPLYER == SONG_SUPPLYER_XIMALAYA)
 	return ximalaya_cloudmusic_play(artists[idx]);
 #elif (SUPPORT_SONG_SUPPLYER == SONG_SUPPLYER_LAPSULE)

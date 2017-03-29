@@ -35,7 +35,9 @@ SRCS += misc/battery_capacity.c
 SRCS += modules/mozart_module_linein.c
 
 #DM6291_FIX
-SRCS += ./dm/dm_network.c ./dm/dm_mozart.c ./dm/dm6291_led.c
+SRCS += ./dm/dm_network.c ./dm/dm_mozart.c ./dm/dm6291_led.c ./dm/dm6291_led_gpio.c ./dm/dm6291_led_pwm.c
+
+#DM6291_FIX end
 
 # common opts.
 CFLAGS = -fPIC -Wall -Werror -g -O2 -I. -I./include/ -I./modules/ -I$(MOLIB_DIR)/usr/include -I$(MOLIB_UPDATER_DIR)/usr/include -I$(MOZART_DIR)/usr/include -I$(MOZART_UPDATER_DIR)/usr/include -I./dm

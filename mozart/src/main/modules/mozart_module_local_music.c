@@ -10,7 +10,7 @@
 #include "mozart_key_function.h"
 #include "mozart_ui.h"
 #include "modules/mozart_module_local_music.h"
-
+#include "dm_mozart.h"
 #if (SUPPORT_LOCALPLAYER == 1)
 
 static int mozart_module_local_music_start(void)
@@ -75,8 +75,11 @@ int mozart_module_local_music_startup(void)
 
 		info = mozart_musiclist_get_info(id, (char *)music_name, (char *)music_url, NULL,
 						 NULL, NULL, NULL);
-		if (info)
+		if (i == 0) 
+			dm_localplayer_start_insert(music_url);
+		if (info) {
 			mozart_musicplayer_musiclist_insert(mozart_musicplayer_handler, info);
+		}
 	}
 
 	ret = mozart_musicplayer_play_index(mozart_musicplayer_handler, 0);

@@ -88,6 +88,7 @@ int domain_playing()
 		return -1;
 	}
 //	printf("domain:%s status:%s\n", memory_domain_str[domain], module_status_str[status]);
+
 	if (status == STATUS_PLAYING)
 		return 1;
 	return 0;
@@ -96,7 +97,16 @@ int domain_playing()
 //monitor play status.if playing , led blinks;
 int check_play_status()
 {
+	int old_playing = g_playing;
 	g_playing = domain_playing();
+	if (old_playing == 0 && g_playing == 1 ) {
+	    printf("JJJHHH old_playing == 0 && g_playing == 1\n");
+		update_led_status();
+	}
+	if (old_playing == 1 && g_playing == 0 ) {
+	    printf("JJJHHH old_playing == 1 && g_playing == 0\n");
+		update_led_status();
+	}
 	return 0;
 }
 
@@ -220,53 +230,15 @@ int is_audio_file(char *fileName)
 	return 0;
 }
 
-static int g_touch = 0;
-int get_touch()
-{
-	return g_touch;
-}
 int dm_key_releaseed(int code)
 {
-	g_touch = 0;
-	update_led_status();
+//	led_state_off();
 	return 0;
 }
 
 int dm_key_pressed(int code)
 {
-	g_touch = 1;
-	update_led_status();
-	return 0;
-}
-
-static int g_musicplayer_type = MUSIC_CLOUD;
-int get_musicplayer_type()
-{
-	return g_musicplayer_type;
-}
-int  dm_handle_musicplayer_insert_list(struct music_info *info)
-{
-	if (strncmp(info->music_url, "/mnt/usb", strlen("/mnt/usb")) == 0) {
-		g_musicplayer_type = MUSIC_USB;
-		return 0;
-	}
-	if (strncmp(info->music_url, "/mnt/sdcard", strlen("/mnt/sdcard")) == 0) {
-		g_musicplayer_type = MUSIC_SD;
-		return 0;
-	}
-	g_musicplayer_type = MUSIC_CLOUD;	
-	return 0;
-}
-int  dm_localplayer_start_insert(const char* music)
-{
-	if(!music) {
-		printf("music is null\n");
-		return -1;
-	}
-	if (strncmp(music, "/mnt/usb", strlen("/mnt/usb")) == 0) {
-		led_mode_on(UDISK_DOMAIN);
-	}else
-		led_mode_on(SDCARD_DOMAIN);
+//	led_state_on();
 	return 0;
 }
 

@@ -123,7 +123,7 @@ int check_wire()
 	//if((ETHER_CONNECT == ether_state_cur) && (ETHER_CONNECT != ether_state_old) )
 	{//disable wifi
 		dm_info("wire up, stop wifi\n");
-//		DM6291_SetLedBrightness_gpio(DM6291_LED_WIFI,DM6291_LED_ON);
+		DM6291_SetLedBrightness(DM6291_LED_WIFI,DM6291_LED_ON);
 		//wifi_mode_old = network_infor.wifi_mode;
 		mozart_stop();
 		stopall(1);

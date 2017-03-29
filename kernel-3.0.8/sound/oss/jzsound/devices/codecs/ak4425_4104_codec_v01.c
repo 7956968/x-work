@@ -177,8 +177,8 @@ unsigned char ak4425_registers[][2] = {
 	//{ 0x00 ,0x8f },//sample rate auto setting mode
 	{ 0x01 ,0x02 },
 	{ 0x02 ,0x00 },
-	{ 0x03 ,0xff },//volume 
-	{ 0x04 ,0xff },/**/
+	{ 0x03 ,0x64 },//volume 
+	{ 0x04 ,0x64 },/**/
 	{ 0x00 ,0x8f },//sample rate auto setting mode
 	//{ 0x00 ,0x8f },//sample rate auto setting mode
 };
@@ -323,7 +323,7 @@ static int codec_set_replay_volume(int *val)
 		*val = 100;
 
 	if (*val) {
-		vol = ((*val)*255)/100;
+		vol = ((*val)*180)/100;
 		data = (unsigned char)vol;                       //printk("data1111:%d vol=%d: *val=%d\n", data,vol,*val);
 		AK4425_write_data(0x01, 0x02);
 		mdelay(5);
@@ -334,9 +334,9 @@ static int codec_set_replay_volume(int *val)
 		/* Digital Volume mute */
 		AK4425_write_data(0x01, 0x03);
 		mdelay(5);//printk("data000:%d: \n", data);
-		/*AK4425_write_data(0x03, 0x00);
+		AK4425_write_data(0x03, 0x00);
 		mdelay(5);
-		AK4425_write_data(0x04, 0x00);*/
+		AK4425_write_data(0x04, 0x00);
 	}
 	user_replay_volume = *val;
 	return *val;

@@ -16,6 +16,9 @@
 #include "mozart_musicplayer.h"
 #include "mozart_key_function.h"
 
+#include "dm6291_led.h"
+#include "sharememory_interface.h"
+
 /* #define MOZART_INGENICPLAYER_DEBUG */
 #ifdef MOZART_INGENICPLAYER_DEBUG
 #define pr_debug(fmt, args...)				\
@@ -111,6 +114,8 @@ static int mozart_module_ingenicplayer_start(void)
 	} else {
 		mozart_musicplayer_musiclist_clean(mozart_musicplayer_handler);
 	}
+	
+	led_mode_on(LAPSULE_DOMAIN);
 
 	return 0;
 }

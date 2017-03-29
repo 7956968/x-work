@@ -9,6 +9,8 @@
 #include "ingenicplayer.h"
 #include "mozart_musicplayer.h"
 
+#include "dm_mozart.h"
+
 /* #define MOZART_MUSICPLAYER_DEBUG */
 #ifdef MOZART_MUSICPLAYER_DEBUG
 #define pr_debug(fmt, args...)				\
@@ -180,15 +182,16 @@ int mozart_musicplayer_musiclist_get_length(musicplayer_handler_t *handler)
 {
 	int ret;
 
-	musicplayer_lock(&musicplayer_mutex);
+	//hzb modify for avoiding deadlock
+	//musicplayer_lock(&musicplayer_mutex);
 	if (check_handler_uuid(handler) < 0) {
 		pr_debug("check handler uuid failed\n");
-		musicplayer_unlock(&musicplayer_mutex);
+		//musicplayer_unlock(&musicplayer_mutex);
 		return -1;
 	}
 
 	ret = mozart_musiclist_get_length(musicplayer_list);
-	musicplayer_unlock(&musicplayer_mutex);
+	//musicplayer_unlock(&musicplayer_mutex);
 
 	return ret;
 }
@@ -264,6 +267,7 @@ int mozart_musicplayer_play_shortcut(musicplayer_handler_t *handler, int index)
 {
 	char shortcut_name[20] = {};
 
+	//HZB:may cause deadlock
 	musicplayer_lock(&musicplayer_mutex);
 	if (check_handler_uuid(handler) < 0) {
 		pr_err("check handler uuid failed\n");

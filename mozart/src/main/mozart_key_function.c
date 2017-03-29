@@ -1078,13 +1078,19 @@ void mozart_snd_source_switch(void)
 	while (1) {
 		source = (source + 1) % SND_SRC_MAX;
 #ifdef SUPPORT_SONG_SUPPLYER
-		if (source == SND_SRC_CLOUD && get_wifi_mode().wifi_mode != STA)
+		if (source == SND_SRC_CLOUD && (get_wifi_mode().wifi_mode != STA || snd_source == SND_SRC_INGENICPLAYER) )
 			continue;
 #endif
 #if (SUPPORT_LOCALPLAYER == 1)
 		if (source == SND_SRC_LOCALPLAY &&
 		    (tfcard_status == 0 || tfcard_status == -1))
 			continue;
+#endif
+//HZB disable bt,because it may cause some problem
+#if (SUPPORT_BT == BT_BCM)
+		if (source == SND_SRC_BT_AVK) {
+			continue;
+		}
 #endif
 #if (SUPPORT_INGENICPLAYER == 1)
 		if (source == SND_SRC_INGENICPLAYER)

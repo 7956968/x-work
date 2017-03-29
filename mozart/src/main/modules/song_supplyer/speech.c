@@ -12,7 +12,7 @@
 #include "mozart_config.h"
 #include "mozart_musicplayer.h"
 #include "vr_interface.h"
-
+#include "dm6291_led.h"
 int speech_cloudmusic_playmusic(sds_music_t *music, int index)
 {
 	int i = 0;
@@ -25,7 +25,7 @@ int speech_cloudmusic_playmusic(sds_music_t *music, int index)
 	mozart_musicplayer_start(mozart_musicplayer_handler);
 
 	mozart_musicplayer_musiclist_clean(mozart_musicplayer_handler);
-
+	led_mode_on(VR_DOMAIN);
 	for (i = 0; i < music->number; i++) {
 		info = mozart_musiclist_get_info(-1,/* songid ignore */
 										 music->data[i].title,

@@ -472,7 +472,8 @@ struct input_event_key_info {
 	int timeout_second;
 	void (*handler)(bool long_press);
 };
-
+//HZB
+#if 0
 static void wifi_switch_handler(bool long_press)
 {
 	if (long_press)
@@ -480,6 +481,8 @@ static void wifi_switch_handler(bool long_press)
 	else
 		create_wifi_switch_pthread();
 }
+#endif
+
 
 static void volume_down_handler(bool long_press)
 {
@@ -506,6 +509,8 @@ static void play_pause_handler(bool long_press)
 }
 
 static struct input_event_key_info input_event_key_infos[] = {
+	//HZB
+	#if 0
 	{
 		.name = "wifi_switch_key",
 		.key_code = KEY_MODE,
@@ -514,6 +519,7 @@ static struct input_event_key_info input_event_key_infos[] = {
 		.timeout_second = 1,
 		.handler = wifi_switch_handler,
 	},
+	#endif
 	{
 		.name = "volume_up_key",
 		.key_code = KEY_VOLUMEUP,
@@ -545,6 +551,8 @@ static void *key_long_press_func(void *args)
 	struct timeval now;
 	struct timespec timeout;
 	struct input_event_key_info *info = (struct input_event_key_info *)args;
+	
+	dm_key_pressed(info->key_code);
 
 	pthread_mutex_lock(&info->lock);
 	if (info->state == KEY_LONG_PRESS_CANCEL) {
@@ -553,6 +561,7 @@ static void *key_long_press_func(void *args)
 		if (info->handler)
 			info->handler(false);
 		pthread_mutex_unlock(&info->lock);
+		dm_key_releaseed(info->key_code);
 		return NULL;
 	}
 
@@ -569,6 +578,7 @@ static void *key_long_press_func(void *args)
 		if (info->handler)
 			info->handler(false);
 		pthread_mutex_unlock(&info->lock);
+		dm_key_releaseed(info->key_code);
 		return NULL;
 	}
 
@@ -578,6 +588,8 @@ static void *key_long_press_func(void *args)
 	if (info->handler)
 		info->handler(true);
 	pthread_mutex_unlock(&info->lock);
+	
+	dm_key_releaseed(info->key_code);
 
 	return NULL;
 }
@@ -644,11 +656,13 @@ void keyevent_callback(mozart_event event, void *param)
 		}
 		printf("[DEBUG] key %s %s!!!\n",
 			   keycode_str[event.event.key.key.code], keyvalue_str[event.event.key.key.value]);
-
 		if (input_event_handler(event.event.key.key) == 0)
 			break;
 
 		if (event.event.key.key.value == 1) {
+			//HZB add
+			dm_key_pressed(event.event.key.key.code);
+			
 			switch (event.event.key.key.code)
 			{
 			case KEY_RECORD:
@@ -671,6 +685,9 @@ void keyevent_callback(mozart_event event, void *param)
 				break;
 			case KEY_F1:
 				create_wifi_config_pthread(); // in case of block.
+				break;
+			case KEY_MODE:
+				create_wifi_switch_pthread();
 				break;
 			case KEY_BLUETOOTH:
 				key_bluetooth_handler();
@@ -702,6 +719,8 @@ void keyevent_callback(mozart_event event, void *param)
 				break;
 			}
 		} else {
+			//HZB add
+			dm_key_releaseed(event.event.key.key.code);
 			switch (event.event.key.key.code) {
 			case KEY_RECORD:
 				/*TODO: add VR_WAKEUP_KEY_LONGPRESS support*/
@@ -922,6 +941,7 @@ void miscevent_callback(mozart_event event, void *param)
 				if (mozart_module_stop()) {
 					share_mem_set(BT_AVK_DOMAIN, RESPONSE_CANCEL);
 				} else {
+					led_mode_on(BT_AVK_DOMAIN);
 					share_mem_set(BT_AVK_DOMAIN, RESPONSE_DONE);
 					snd_source = SND_SRC_BT_AVK;
 				}
@@ -1178,8 +1198,10 @@ void miscevent_callback(mozart_event event, void *param)
 			} else if (!strcasecmp(event.event.misc.type, "play")){
 				if (mozart_module_stop())
 					share_mem_set(RENDER_DOMAIN, RESPONSE_CANCEL);
-				else
-					share_mem_set(RENDER_DOMAIN, RESPONSE_DONE);
+				else {
+					led_mode_on(RENDER_DOMAIN);
+					share_mem_set(RENDER_DOMAIN, RESPONSE_DONE);					
+				}
 			} else if (!strcasecmp(event.event.misc.type, "pause")){
 				printf("dlna player paused.\n");
 			} else if (!strcasecmp(event.event.misc.type, "resume")){
@@ -1206,8 +1228,10 @@ void miscevent_callback(mozart_event event, void *param)
 			if (!strcasecmp(event.event.misc.type, "connected")) {
 				if (mozart_module_stop())
 					share_mem_set(AIRPLAY_DOMAIN, RESPONSE_CANCEL);
-				else
+				else {
+					led_mode_on(AIRPLAY_DOMAIN);
 					share_mem_set(AIRPLAY_DOMAIN, RESPONSE_DONE);
+				}
 			} else if (!strcasecmp(event.event.misc.type, "disconnected")) {
 				printf("phone disconnected, airplay play stop.\n");
 			} else if (!strcasecmp(event.event.misc.type, "paused")) {
@@ -1450,6 +1474,7 @@ int network_callback(const char *p)
 #if 1
 			dm_set_airkissing(0);
 			update_led_status();
+			dm_wifi_mode_switch(SW_AP);
 #endif
 		}
 	} else if (!strncmp(network_event.type, event_type_str[WIFI_MODE], strlen(event_type_str[WIFI_MODE]))) {
@@ -1801,6 +1826,7 @@ int main(int argc, char **argv)
 				if(count/4*4==count)//every 4s
 					set_eth_ip();
 				check_play_status();
+				update_led_status();
 				++count;
 				sleep(1);
 #else
