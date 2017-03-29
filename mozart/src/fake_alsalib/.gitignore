@@ -1,2 +1,3 @@
 libfake_alsalib.so
+libasound.so.2
 *.o
