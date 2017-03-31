@@ -81,7 +81,8 @@ int mozart_module_cloud_music_startup(void)
 	sprintf(buf, "欢迎回来，为您播放%s的歌", artists[idx]);
 	mozart_tts(buf);
 	mozart_tts_wait();
-	led_mode_on(MUSICPLAYER_DOMAIN);
+	printf("bbb\n");
+	current_play_domain_change(PM_CLOUD);
 #if (SUPPORT_SONG_SUPPLYER == SONG_SUPPLYER_XIMALAYA)
 	return ximalaya_cloudmusic_play(artists[idx]);
 #elif (SUPPORT_SONG_SUPPLYER == SONG_SUPPLYER_LAPSULE)
@@ -91,6 +92,7 @@ int mozart_module_cloud_music_startup(void)
 #elif (SUPPORT_SONG_SUPPLYER == SONG_SUPPLYER_AISPEECH)
 	return speech_cloudmusic_play(artists[idx]);
 #else
+	printf("mozart_module_cloud_music_startup end\n");
 	return 0;
 #endif
 }

@@ -31,6 +31,7 @@ extern snd_source_t snd_source;
 extern char *keyvalue_str[];
 extern char *keycode_str[];
 extern int tfcard_status;
+extern int udisk_status;
 
 extern char *app_name;
 extern snd_source_t snd_source;
@@ -48,5 +49,8 @@ extern void mozart_linein_off(void);
 extern void mozart_snd_source_switch(void);
 extern void mozart_music_list(int);
 extern enum mozart_module_play_status mozart_module_get_play_status(void);
+int first_class_key_switch_source();
+int first_class_disconnect_switch_source();
+void mozart_refresh_volume(void);
 
 #endif	/* __MOZART_KEY_FUNCTION_H__ */

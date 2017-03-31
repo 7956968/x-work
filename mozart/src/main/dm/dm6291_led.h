@@ -3,7 +3,7 @@
 
 
 #include <sharememory_interface.h>
-
+#include "dm_mozart.h"
 typedef enum _LED_NUM
 {
     DM6291_LED_TOUCH_PWM=0,
@@ -33,7 +33,8 @@ struct dm_led {
 
 int led_state_off();
 int led_state_on();
-int led_mode_on(memory_domain domain);
+int led_play_mode(enum PlayMode);
+
 
 int update_led_status();
 int get_trigger_path(DM6291_LED_NUM led, char* path, int size);

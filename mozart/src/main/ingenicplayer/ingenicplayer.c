@@ -115,7 +115,7 @@ static int mozart_module_ingenicplayer_start(void)
 		mozart_musicplayer_musiclist_clean(mozart_musicplayer_handler);
 	}
 	
-	led_mode_on(LAPSULE_DOMAIN);
+	current_play_domain_change(PM_INGENIC);
 
 	return 0;
 }

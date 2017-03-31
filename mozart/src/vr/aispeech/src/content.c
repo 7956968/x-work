@@ -164,6 +164,7 @@ int content_get(char *text){
 	json_object *request = NULL;
 	json_object *param = NULL;
 
+
 	if (ai_vr_callback == NULL) {
 		printf("ai_vr_callback is null\n");
 		goto exit_error;
@@ -197,10 +198,13 @@ int content_get(char *text){
 			uuid, _content_callback, &usrdata);
 	aiengine_stop(sds_agn);
 
+
 	if (pthread_create(&content_wait_pthread, NULL, content_wait_func, NULL)) {
 		PERROR("create content_wait_pthread error: %s.\n", strerror(errno));
 		return -1;
 	}
+
+	printf("bbbb\n");
 
 	if(param){
 		json_object_put(param);

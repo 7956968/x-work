@@ -18,6 +18,8 @@
 
 int linein_fd = -1;
 
+#if (SUPPORT_LINEIN == 1)
+
 static bool mozart_m150_linein_is_in(void)
 {
     char buf[2] = {};
@@ -57,6 +59,8 @@ static bool mozart_x1000_linein_is_in(void)
 	return false;
     }
 }
+
+#endif
 
 static int mozart_m150_linein_open(void)
 {
@@ -221,6 +225,7 @@ void mozart_linein_close(void)
 
 bool mozart_linein_is_in(void)
 {
+#if (SUPPORT_LINEIN == 1)
 	char buf[8] = {};
 	if (mozart_ini_getkey("/usr/data/system.ini", "product", "cpu", buf)) {
 		return mozart_m150_linein_is_in();
@@ -232,5 +237,6 @@ bool mozart_linein_is_in(void)
 		return mozart_m150_linein_is_in();
 
 	printf("Unknow cpu model, get linein state failed.\n");
+#endif
 	return false;
 }

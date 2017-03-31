@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "sharememory_interface.h"
 #include "tips_interface.h"
 #include "dm6291_led.h"
 #include "ini_interface.h"
@@ -92,6 +91,21 @@ int domain_playing()
 		return 1;
 	return 0;
 }
+
+memory_domain get_current_domain()
+{
+	memory_domain domain;
+	int ret = -1;
+
+	ret = share_mem_get_active_domain(&domain);
+	if (ret) {
+		printf("get active domain error in %s:%s:%d, do nothing.\n",
+		       __FILE__, __func__, __LINE__);
+		return -1;
+	}
+	return domain;
+}
+
 
 //monitor play status.if playing , led blinks;
 int check_play_status()
@@ -264,13 +278,65 @@ int  dm_localplayer_start_insert(const char* music)
 		return -1;
 	}
 	if (strncmp(music, "/mnt/usb", strlen("/mnt/usb")) == 0) {
-		led_mode_on(UDISK_DOMAIN);
+		current_play_domain_change(PM_UDISK);
 	}else
-		led_mode_on(SDCARD_DOMAIN);
+		current_play_domain_change(PM_SDCARD);
 	return 0;
 }
 
+//由于原来sdk逻辑中的domain和snd_source都不能用于准确指示当前播放模式，因此定义此枚举变量用于指示当前播放模式
+static enum PlayMode g_current_play_mode = PM_NONE;
+int current_play_domain_change(enum PlayMode new_mode)
+{
+	printf("playmode change, last(%d), current(%d)\n", g_current_play_mode, new_mode);
+	if ( (PM_BTAVK == g_current_play_mode || PM_BTHS == g_current_play_mode) && (new_mode !=PM_BTAVK && new_mode != PM_BTHS)) {
+		mozart_refresh_volume();
+	}
+	g_current_play_mode = new_mode;
+	led_play_mode(new_mode);
+	return 0;
+}
 
+enum PlayMode get_current_playmode()
+{
+	return g_current_play_mode;
+}
+
+int first_class_playing()
+{
+	enum PlayMode  mode = get_current_playmode();
+	if (mode == PM_AIRPLAY ||mode == PM_RENDER || mode == PM_INGENIC || mode == PM_BTAVK || mode == PM_BTHS)
+		return 1;
+	else 
+		return 0;
+}
+
+static int first_class_disconnect = 0;
+int set_first_class_disconnect()
+{
+	first_class_disconnect = 1;
+	return 0;
+}
+
+int get_first_class_disconnect()
+{
+	return first_class_disconnect;
+}
+
+int handle_first_class_disconnect()
+{
+	first_class_disconnect_switch_source();
+	first_class_disconnect = 0;
+	return 0;	
+}
+
+int in_depend_network_playmode()
+{
+	enum PlayMode mode = get_current_playmode();
+	if (mode == PM_CLOUD || mode == PM_AIRPLAY || mode == PM_RENDER|| mode == PM_INGENIC)
+		return 1;
+	return 0;
+}
 
 #if 0
 void sig_handler(int signo)

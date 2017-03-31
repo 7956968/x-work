@@ -67,6 +67,7 @@ event_handler *keyevent_handler = NULL;
 event_handler *miscevent_handler = NULL;
 char *app_name = NULL;
 int tfcard_status = -1;
+int udisk_status = -1;
 static int null_cnt = 0;
 
 #if (SUPPORT_MULROOM == 1)
@@ -331,8 +332,19 @@ void tfcard_scan_1music_callback(void)
 void tfcard_scan_done_callback(char *musiclist)
 {
 #if 1
+	printf("tfcard_scan_done_callback musiclist:%s\n", musiclist);
 	/* TODO; musicplayer add queue */
-	tfcard_status = 1;
+	//hzb disable this, because maybe udisk
+	if (musiclist) {
+		if( (strstr(musiclist, "\\/mnt\\/sdcard\\/")) != NULL) {
+			printf("find music in sdcard\n");
+			tfcard_status = 1;
+		}
+		else if( (strstr(musiclist, "\\/mnt\\/usb\\/")) != NULL) 
+			printf("find music in udisk\n");
+			udisk_status = 1;
+	}
+	//tfcard_status = 1;
 	mozart_module_local_music_startup();
 #endif
 }
@@ -699,7 +711,10 @@ void keyevent_callback(mozart_event event, void *param)
 				mozart_next_song();
 				break;
 			case KEY_MENU:
-				mozart_snd_source_switch();
+				if (first_class_playing()) 
+					first_class_key_switch_source();
+				else
+					mozart_snd_source_switch();
 				break;
 			case KEY_F3:            /* music music Shortcut key 1 */
 				//HZB comment this statement because it will cause dead lock
@@ -758,6 +773,26 @@ void miscevent_callback(mozart_event event, void *param)
 				mozart_linein_off();
 				lapsule_do_linein_off();
 			}
+		} else if (!strcasecmp(event.event.misc.name, "udisk")) {
+			if (!strcasecmp(event.event.misc.type, "plugin")) { // plugin
+				if (udisk_status != 1) {
+					mozart_ui_localplayer_plugin();
+					mozart_play_key("tf_add");
+					udisk_status = 1;
+				} else {
+					// do nothing.
+				}
+			} else if (!strcasecmp(event.event.misc.type, "plugout")) { // tfcard plugout
+				if (udisk_status != 0) {
+					mozart_ui_localplayer_plugout();
+					mozart_play_key("tf_remove");
+#if (SUPPORT_LOCALPLAYER == 1)
+					if (get_current_playmode() == PM_UDISK)
+						mozart_snd_source_switch();
+#endif
+					udisk_status = 0;
+				}
+			}
 		} else if (!strcasecmp(event.event.misc.name, "tfcard")) {
 			if (!strcasecmp(event.event.misc.type, "plugin")) { // tfcard plugin
 				if (tfcard_status != 1) {
@@ -769,12 +804,13 @@ void miscevent_callback(mozart_event event, void *param)
 				}
 			} else if (!strcasecmp(event.event.misc.type, "plugout")) { // tfcard plugout
 				if (tfcard_status != 0) {
+					mozart_play_key("tf_remove");
 					mozart_ui_localplayer_plugout();
 #if (SUPPORT_LOCALPLAYER == 1)
-					if (snd_source == SND_SRC_LOCALPLAY)
-						mozart_musicplayer_stop(mozart_musicplayer_handler);
+					if (get_current_playmode() == PM_SDCARD) {
+						mozart_snd_source_switch();
+					}
 #endif
-					mozart_play_key("tf_remove");
 					tfcard_status = 0;
 				}
 			}
@@ -867,6 +903,8 @@ void miscevent_callback(mozart_event event, void *param)
 					mozart_bluetooth_pbc_close_connection();
 #endif
 				}
+				if (get_current_playmode() == PM_BTHS)
+					set_first_class_disconnect();
 			} else if (!strcasecmp(event.event.misc.type, "ring")) {
 
 #ifdef SUPPORT_VR
@@ -902,6 +940,7 @@ void miscevent_callback(mozart_event event, void *param)
 				if (mozart_module_stop()) {
 					share_mem_set(BT_HS_DOMAIN, RESPONSE_CANCEL);
 				} else {
+					current_play_domain_change(PM_BTHS);
 					share_mem_set(BT_HS_DOMAIN, RESPONSE_DONE);
 					snd_source = SND_SRC_BT_AVK;
 				}
@@ -937,11 +976,13 @@ void miscevent_callback(mozart_event event, void *param)
 						mozart_ui_bt_disconnected();
 					}
 				}
+				if (get_current_playmode() == PM_BTAVK)
+					set_first_class_disconnect();
 			} else if (!strcasecmp(event.event.misc.type, "play")) {
 				if (mozart_module_stop()) {
 					share_mem_set(BT_AVK_DOMAIN, RESPONSE_CANCEL);
 				} else {
-					led_mode_on(BT_AVK_DOMAIN);
+					current_play_domain_change(PM_BTAVK);
 					share_mem_set(BT_AVK_DOMAIN, RESPONSE_DONE);
 					snd_source = SND_SRC_BT_AVK;
 				}
@@ -1194,12 +1235,13 @@ void miscevent_callback(mozart_event event, void *param)
 			if (!strcasecmp(event.event.misc.type, "connected")) {
 				; // do nothing on dlna device connected event
 			} else if (!strcasecmp(event.event.misc.type, "disconnected")) {
-				; // do nothing on dlna device disconnected event
+				if (get_current_playmode() == PM_RENDER)
+					set_first_class_disconnect();
 			} else if (!strcasecmp(event.event.misc.type, "play")){
 				if (mozart_module_stop())
 					share_mem_set(RENDER_DOMAIN, RESPONSE_CANCEL);
 				else {
-					led_mode_on(RENDER_DOMAIN);
+					current_play_domain_change(PM_RENDER);
 					share_mem_set(RENDER_DOMAIN, RESPONSE_DONE);					
 				}
 			} else if (!strcasecmp(event.event.misc.type, "pause")){
@@ -1229,11 +1271,13 @@ void miscevent_callback(mozart_event event, void *param)
 				if (mozart_module_stop())
 					share_mem_set(AIRPLAY_DOMAIN, RESPONSE_CANCEL);
 				else {
-					led_mode_on(AIRPLAY_DOMAIN);
+					current_play_domain_change(PM_AIRPLAY);
 					share_mem_set(AIRPLAY_DOMAIN, RESPONSE_DONE);
 				}
 			} else if (!strcasecmp(event.event.misc.type, "disconnected")) {
 				printf("phone disconnected, airplay play stop.\n");
+				if (get_current_playmode() == PM_AIRPLAY)
+					set_first_class_disconnect();
 			} else if (!strcasecmp(event.event.misc.type, "paused")) {
 				printf("airplay play paused.\n");
 			} else if (!strcasecmp(event.event.misc.type, "resumed")) {
@@ -1372,7 +1416,7 @@ int network_callback(const char *p)
 			{
 				mozart_ui_net_connect_failed();
 				mozart_play_key("wifi_link_failed");
-#if 0	//DM6291_FIX	
+#if 1	//DM6291_FIX	
 	            new_mode.cmd = SW_AP;
 	            new_mode.force = true;
 	            strcpy(new_mode.name, app_name);
@@ -1391,7 +1435,7 @@ int network_callback(const char *p)
 		}
 		if(!strncmp(network_event.content, "STA_SCAN_OVER", strlen("STA_SCAN_OVER"))){
 //DAMAI add
-#if 0
+#if 1
 			printf("sta scan over, sw to ap\n");
 			dm_wifi_mode_switch(SW_AP);
 			//do not thing 
@@ -1494,6 +1538,12 @@ int network_callback(const char *p)
 			mozart_led_turn_slow_flash(LED_WIFI);
 			mozart_play_key("wifi_ap_mode");
 			startall(1);
+			//a little bad, fix it.
+			if (in_depend_network_playmode() || mozart_module_get_play_status() == mozart_module_status_stop)
+				mozart_snd_source_switch();
+			else
+				if (mozart_module_get_play_status() == mozart_module_status_pause)
+				mozart_play_pause();
 		} else if (infor.wifi_mode == STA) {
 			mozart_ui_net_connected();
 			null_cnt = 0;
@@ -1521,6 +1571,11 @@ int network_callback(const char *p)
 			}
 #else
 			startall(1);
+			if (in_depend_network_playmode() || mozart_module_get_play_status() == mozart_module_status_stop)
+				mozart_snd_source_switch();
+			else
+				if (mozart_module_get_play_status() == mozart_module_status_pause)
+				mozart_play_pause();
 #endif /* SUPPORT_MULROOM == 1 */
 		} else if (infor.wifi_mode == WIFI_NULL) {
 			null_cnt++;
@@ -1584,9 +1639,10 @@ static int initall(void)
 		share_mem_set(SDCARD_DOMAIN, STATUS_EXTRACT);
 	}
 
-	if (mozart_path_is_mount("/mnt/usb"))
+	if (mozart_path_is_mount("/mnt/usb")) {
+		udisk_status = 1;
 		share_mem_set(UDISK_DOMAIN, STATUS_INSERT);
-	else
+	}else
 		share_mem_set(UDISK_DOMAIN, STATUS_EXTRACT);
 
 	// shairport ini_interface.hinit(do not depend network part)
@@ -1677,7 +1733,7 @@ void *mozart_updater_check_version(void *arg)
 int main(int argc, char **argv)
 {
 	int daemonize = 0;
-
+	printf("mozart 3\n");
 	app_name = argv[0];
 	wifi_ctl_msg_t new_mode;
 	struct wifi_client_register wifi_info;
@@ -1827,6 +1883,9 @@ int main(int argc, char **argv)
 					set_eth_ip();
 				check_play_status();
 				update_led_status();
+				//todo: a little bad, use thread commucation to fix this.
+				if (get_first_class_disconnect() > 0)
+					handle_first_class_disconnect();
 				++count;
 				sleep(1);
 #else

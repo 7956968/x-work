@@ -299,6 +299,8 @@ int startall(int depend_network)
 		start(AIRPLAY);
 #endif
 #ifdef SUPPORT_VR
+	//if start vr in ap mode without authorization, it will stuck some time. 
+	if (get_wifi_mode().wifi_mode == STA)
 		start(VR);
 #endif
 #if (SUPPORT_LAPSULE == 1)
@@ -310,6 +312,7 @@ int startall(int depend_network)
 		mozart_appserver_register_callback(1 * 1024 * 1024, appserver_cmd_callback);
 #endif
 
+#if 0
 #if (SUPPORT_LOCALPLAYER == 1)
 		if (snd_source != SND_SRC_LOCALPLAY) {
 			if (get_wifi_mode().wifi_mode == STA)
@@ -320,6 +323,7 @@ int startall(int depend_network)
 #else
 		if (get_wifi_mode().wifi_mode == STA)
 			mozart_module_cloud_music_startup();
+#endif
 #endif
 	}
 

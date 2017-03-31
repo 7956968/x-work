@@ -67,45 +67,37 @@ int turn_on_musicplayer_led(int musicplayer_type)
 	return 0;
 }
 
-int led_mode_on(memory_domain domain)
+
+int led_play_mode(enum PlayMode mode)
 {
-#if 0
-	static memory_domain cur_domain = UNKNOWN_DOMAIN;
-	static int cur_musicplayer_type = 0;
-	int musicplayer_type = get_musicplayer_type();
-	if (domain == cur_domain && musicplayer_type == cur_musicplayer_type)
-		return 0;
-	cur_domain = domain;
-	cur_musicplayer_type = musicplayer_type;
-#endif
 	DM6291_SetLedBrightness_gpio(DM6291_LED_SD,DM6291_LED_OFF);	
 	DM6291_SetLedBrightness_gpio(DM6291_LED_USB,DM6291_LED_OFF);	
 	DM6291_SetLedBrightness_gpio(DM6291_LED_NET,DM6291_LED_OFF);	
 	DM6291_SetLedBrightness_gpio(DM6291_LED_WIFI,DM6291_LED_OFF);	
 	DM6291_SetLedBrightness_gpio(DM6291_LED_BT,DM6291_LED_OFF);	
-	switch(domain) {
-		case SDCARD_DOMAIN:
+	switch(mode) {
+		case PM_SDCARD:
 			DM6291_SetLedBrightness_gpio(DM6291_LED_SD,DM6291_LED_ON);	
 			break;
-		case UDISK_DOMAIN:
+		case PM_UDISK:
 			DM6291_SetLedBrightness_gpio(DM6291_LED_USB,DM6291_LED_ON);	
 			break;
-		case RENDER_DOMAIN:
-		case AIRPLAY_DOMAIN:
+		case PM_RENDER:
+		case PM_AIRPLAY:
 			DM6291_SetLedBrightness_gpio(DM6291_LED_WIFI,DM6291_LED_ON);	
 			break;
-		case BT_AVK_DOMAIN:
+		case PM_BTAVK:
+		case PM_BTHS:
 			DM6291_SetLedBrightness_gpio(DM6291_LED_BT,DM6291_LED_ON);	
 			break;
-		case MUSICPLAYER_DOMAIN:	//MUSICPLAYERDOMAIN means cloud music
-		case LAPSULE_DOMAIN://LAPSULE_MOMAIN means ingenic player
-		case VR_DOMAIN:
+		case PM_CLOUD:	
+		case PM_INGENIC:
+		case PM_VR:
 			DM6291_SetLedBrightness_gpio(DM6291_LED_NET,DM6291_LED_ON);
 			break;
 		default:
 			break;
 	}
-	printf("current domain: %s\n", memory_domain_str[domain]);
 	return 0;
 }
 

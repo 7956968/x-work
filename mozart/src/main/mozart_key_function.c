@@ -1067,40 +1067,8 @@ int mozart_module_stop(void)
 
 	return ret;
 }
-
-void mozart_snd_source_switch(void)
+static void do_mozart_snd_source_switch(int source)
 {
-	snd_source_t source = snd_source;
-
-	mozart_module_stop();
-
-	// find the next snd source.
-	while (1) {
-		source = (source + 1) % SND_SRC_MAX;
-#ifdef SUPPORT_SONG_SUPPLYER
-		if (source == SND_SRC_CLOUD && (get_wifi_mode().wifi_mode != STA || snd_source == SND_SRC_INGENICPLAYER) )
-			continue;
-#endif
-#if (SUPPORT_LOCALPLAYER == 1)
-		if (source == SND_SRC_LOCALPLAY &&
-		    (tfcard_status == 0 || tfcard_status == -1))
-			continue;
-#endif
-//HZB disable bt,because it may cause some problem
-#if (SUPPORT_BT == BT_BCM)
-		if (source == SND_SRC_BT_AVK) {
-			continue;
-		}
-#endif
-#if (SUPPORT_INGENICPLAYER == 1)
-		if (source == SND_SRC_INGENICPLAYER)
-			continue;
-#endif
-		if (source == SND_SRC_LINEIN && !mozart_linein_is_in())
-			continue;
-		break;
-	}
-
 	if (mozart_check_dsp() < 0)
 		return ;
 
@@ -1142,7 +1110,77 @@ void mozart_snd_source_switch(void)
 	}
 	return;
 }
+void mozart_snd_source_switch(void)
+{
+	snd_source_t source = snd_source;
 
+	mozart_module_stop();
+
+	int cycle_flag = 0;
+	// find the next snd source.
+	while (1) {
+		source = (source + 1) % SND_SRC_MAX;
+		if (cycle_flag > 0) {
+			printf("not any music can be play\n");
+			return;
+		}
+		if ( source == snd_source)
+			cycle_flag=1;
+#ifdef SUPPORT_SONG_SUPPLYER
+		if (source == SND_SRC_CLOUD && (get_wifi_mode().wifi_mode != STA || snd_source == SND_SRC_INGENICPLAYER) )
+			continue;
+#endif
+#if (SUPPORT_LOCALPLAYER == 1)
+		if (source == SND_SRC_LOCALPLAY &&
+		    (tfcard_status == 0 || tfcard_status == -1) && udisk_status != 1)
+			continue;
+#endif
+//HZB disable bt,because it may cause some problem
+#if (SUPPORT_BT == BT_BCM)
+		if (source == SND_SRC_BT_AVK) {
+			continue;
+		}
+#endif
+#if (SUPPORT_INGENICPLAYER == 1)
+		if (source == SND_SRC_INGENICPLAYER)
+			continue;
+#endif
+		if (source == SND_SRC_LINEIN && !mozart_linein_is_in())
+			continue;
+		break;
+	}
+	do_mozart_snd_source_switch(source);
+
+	return;
+}
+
+int first_class_key_switch_source()
+{
+	mozart_snd_source_switch();
+	return 0;
+}
+
+int first_class_disconnect_switch_source()
+{
+
+	mozart_snd_source_switch();
+	#if 0
+
+	mozart_module_stop();
+	snd_source_t source = SND_SRC_LOCALPLAY;
+	
+	if ((tfcard_status == 1 || udisk_status == 1)) {
+		do_mozart_snd_source_switch(source);
+		return 0;
+	}
+	source = SND_SRC_CLOUD;
+ 	if ((get_wifi_mode().wifi_mode == STA )) {
+		do_mozart_snd_source_switch(source);
+		return 0;
+	}
+#endif
+	return 0;
+}
 void mozart_volume_up(void)
 {
 	int vol = 0;
@@ -1363,6 +1401,116 @@ void mozart_volume_down(void)
 
 			mozart_volume_set(avk_volume_set_dsp[i], BT_MUSIC_VOLUME);
 			mozart_bluetooth_avk_set_volume_down(avk_volume_set_phone[i]);
+		}
+		break;
+#endif
+	default:
+		mozart_volume_set(vol, MUSIC_VOLUME);
+		break;
+	}
+}
+
+//sometimes need to refresh volume manually, eg. swtich bt mode to other mode.
+void mozart_refresh_volume(void)
+{
+	printf("mozart_refresh_volume\n");
+	int vol = 0;
+	char vol_buf[8] = {};
+	memory_domain domain;
+	int ret = -1;
+
+	ret = share_mem_get_active_domain(&domain);
+	if (ret) {
+		printf("get active domain error in %s:%s:%d, do nothing.\n",
+		       __FILE__, __func__, __LINE__);
+		return;
+	}
+
+	if (mozart_ini_getkey("/usr/data/system.ini", "volume", "music", vol_buf)) {
+		printf("failed to parse /usr/data/system.ini, set music volume to 20.\n");
+		vol = 20;
+	} else {
+		vol = atoi(vol_buf);
+	}
+
+	if (vol == 100) {
+		printf("max volume already, do nothing.\n");
+		return;
+	}
+
+	switch (domain) {
+	case MUSICPLAYER_DOMAIN:
+		mozart_musicplayer_set_volume(mozart_musicplayer_handler, vol);
+		break;
+#if (SUPPORT_DMR == 1)
+	case RENDER_DOMAIN:
+		if (lapsule_is_controler()) {
+			if (lapsule_do_set_vol(vol))
+				printf("lapsule_do_set_vol failure.\n");
+		}
+		mozart_render_set_volume(vol);
+		break;
+#endif
+#if (SUPPORT_BT == BT_BCM)
+	case BT_HS_DOMAIN:
+		{
+			int i = 0;
+			char vol_buf[8] = {};
+			int hs_volume_set[16] = {0, 6, 13, 20, 26, 33, 40, 46, 53, 60, 66, 73, 80, 86, 93, 100};
+
+			if (mozart_ini_getkey("/usr/data/system.ini", "volume", "bt_call", vol_buf)) {
+				printf("failed to parse /usr/data/system.ini, set BT volume to 66.\n");
+				vol = 66;
+			} else {
+				vol = atoi(vol_buf);
+			}
+
+			if(vol >= 100) {
+				printf("bt volume has maximum!\n");
+				break;
+			}
+			for(i = 0; i < 16; i++) {
+				if(hs_volume_set[i] == vol)
+					break;
+			}
+			if(i > 15) {
+				printf("failed to get bt volume %d from hs_volume_set\n", vol);
+				break;
+			}
+			mozart_volume_set(hs_volume_set[i + 1], BT_CALL_VOLUME);
+			mozart_blutooth_hs_set_volume(BTHF_VOLUME_TYPE_SPK, i + 1);
+			mozart_blutooth_hs_set_volume(BTHF_VOLUME_TYPE_MIC, i + 1);
+		}
+		break;
+	case BT_AVK_DOMAIN:
+		{
+			int i = 0;
+			int avk_volume_max = 17;
+			UINT8 avk_volume_set_dsp[17] = {0, 6, 12, 18, 25, 31, 37, 43, 50, 56, 62, 68, 75, 81, 87, 93, 100};
+			UINT8 avk_volume_set_phone[17] = {0, 15, 23, 31, 39, 47, 55, 63, 71, 79, 87, 95, 103, 111, 113, 125, 127};
+
+			if (mozart_ini_getkey("/usr/data/system.ini", "volume", "bt_music", vol_buf)) {
+				printf("failed to parse /usr/data/system.ini, set BT volume to 66.\n");
+				vol = 63;
+			} else {
+				vol = atoi(vol_buf);
+			}
+
+			if(vol >= 100) {
+				printf("bt volume has maximum!\n");
+				break;
+			}
+			for(i = 0; i < avk_volume_max; i++) {
+				if(avk_volume_set_dsp[i] > vol)
+					break;
+			}
+			if(i >= avk_volume_max) {
+				printf("failed to get music volume %d from avk_volume_set_dsp\n", vol);
+				break;
+			}
+			printf("set avk dsp %d, set phone %d\n", avk_volume_set_dsp[i], avk_volume_set_phone[i]);
+			mozart_volume_set(avk_volume_set_dsp[i], BT_MUSIC_VOLUME);
+			mozart_bluetooth_avk_set_volume_up(avk_volume_set_phone[i]);
 		}
 		break;
 #endif
