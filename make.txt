@@ -1,0 +1,17 @@
+±àÒëÄÚºË£º
+cd kernel-3.0.8
+make distclean 
+make lb_oss_nand_ubi_defconfig
+make
+
+±àÒëmozart
+cd mozart
+make distclean  
+make nw5027lb_ap6212_ubifs_config 
+make
+
+±àÒëuboot
+cd u-boot
+make distclean  
+make canna_v10_zImage_sfc_nand_64mb_lpddr 
+make
