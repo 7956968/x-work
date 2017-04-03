@@ -66,75 +66,21 @@ struct platform_device jz_matrix_kdb_device = {
 
 #ifdef CONFIG_KEYBOARD_JZGPIO
 static struct jz_gpio_keys_button board_longbuttons[] = {
-#ifdef GPIO_POWERDOWN
-        {
-                .gpio                           = GPIO_POWERDOWN,
-                .code = {
-                        .shortpress_code        = KEY_SLEEP,
-                        .longpress_code         = KEY_POWER,
-                },
-                .desc                           = "power down & wakeup",
-                .active_low                     = ACTIVE_LOW_POWERDOWN,
-                .longpress_interval             = 1800,
-		.wakeup                         = 1,
-                .debounce_interval              = 2,
-        },
-#endif
-#ifdef GPIO_BOOT_SEL0
-	{
-                .gpio                           = GPIO_BOOT_SEL0,
-                .code = {
-                        .shortpress_code        = KEY_F4,
-                        .longpress_code         = KEY_RESERVED,
-                },
-                .desc                           = "music Shortcut key 2",
-                .active_low                     = ACTIVE_LOW_F4,
-                .longpress_interval             = 0,
-                .debounce_interval              = 2,
-        },
-#endif
-#ifdef GPIO_BOOT_SEL1
-	{
-                .gpio                           = GPIO_BOOT_SEL1,
-                .code = {
-                        .shortpress_code        = KEY_F5,
-                        .longpress_code         = KEY_RESERVED,
-                },
-                .desc                           = "music Shortcut key 3",
-                .active_low                     = ACTIVE_LOW_F5,
-                .longpress_interval             = 0,
-                .debounce_interval              = 2,
-        },
-
-#endif
-#ifdef GPIO_DM6291_RESET//JJJHHH
-	{
-                .gpio                           = GPIO_DM6291_RESET,
-                .code = {
-                        .shortpress_code        = KEY_F8,
-                        .longpress_code         = KEY_F9,
-                },
-                .desc                           = "RESET KEY OF DM6291 EVB",
-                .active_low                     = ACTIVE_LOW_DM6291_RESET,
-                .longpress_interval             = 5000,//5s 
-                .debounce_interval              = 2,
-        },
-#endif
 
 #ifdef GPIO_NW5027_P3_KEY//JJJHHH
 	{//RESET
                 .gpio                           = GPIO_NW5027_P3_KEY0,
                 .code = {
                         .shortpress_code        = KEY_F1,
-                        .longpress_code         = KEY_F9,
+                        .longpress_code         = KEY_MODE,
                 },
                 .desc                           = "RESET KEY OF NW5027 P3",
                 .active_low                     = ACTIVE_LOW_NW5027_P3_KEY,
-                .longpress_interval             = 8000,//8s 
+                .longpress_interval             = 2000,//1s 
                 .debounce_interval              = 2,
     },
-	{//KEY1
-                .gpio                           = GPIO_NW5027_P3_KEY2,
+	{
+                .gpio                           = GPIO_KEY_PALYPAUSE,
                 .code = {
                         .shortpress_code        = KEY_PLAYPAUSE,
                         .longpress_code         = KEY_NEXTSONG,
@@ -144,8 +90,8 @@ static struct jz_gpio_keys_button board_longbuttons[] = {
                 .longpress_interval             = 1000,//1s 
                 .debounce_interval              = 2,
     },
-    {//KEY2
-                .gpio                           = GPIO_NW5027_P3_KEY1,
+    {
+                .gpio                           = GPIO_KEY_LIKE,
                 .code = {
                         .shortpress_code        = KEY_F3,
                         .longpress_code         = KEY_RESERVED,
@@ -156,12 +102,45 @@ static struct jz_gpio_keys_button board_longbuttons[] = {
                 .debounce_interval              = 2,
     },
     {//KEY3
-                .gpio                           = GPIO_NW5027_P3_KEY3,
+                .gpio                           = GPIO_KEY_RECORD,
                 .code = {
                         .shortpress_code        = KEY_RECORD,
                         .longpress_code         = KEY_RESERVED,
                 },
                 .desc                           = "KEY3 OF NW5027 P3",
+                .active_low                     = ACTIVE_LOW_NW5027_P3_KEY,
+                .longpress_interval             = 0,
+    },
+          
+    {//VOL-
+                .gpio                           = GPIO_KEY_VOLDOWN,
+                .code = {
+                        .shortpress_code        = KEY_VOLUMEDOWN,
+                        .longpress_code         = KEY_RESERVED,
+                },
+                .desc                           = "key voldown",
+                .active_low                     = ACTIVE_LOW_NW5027_P3_KEY,
+                .longpress_interval             = 0,
+                .debounce_interval              = 2,
+    },
+    {//VOL+
+                .gpio                           = GPIO_KEY_VOLUP,
+                .code = {
+                        .shortpress_code        = KEY_VOLUMEUP,
+                        .longpress_code         = KEY_RESERVED,
+                },
+                .desc                           = "key volup",
+                .active_low                     = ACTIVE_LOW_NW5027_P3_KEY,
+                .longpress_interval             = 0,
+                .debounce_interval              = 2,
+    },
+    {//MODE
+                .gpio                           = GPIO_KEY_MODE,
+                .code = {
+                        .shortpress_code        = KEY_MENU,
+                        .longpress_code         = KEY_RESERVED,
+                },
+                .desc                           = "key mode",
                 .active_low                     = ACTIVE_LOW_NW5027_P3_KEY,
                 .longpress_interval             = 0,
                 .debounce_interval              = 2,

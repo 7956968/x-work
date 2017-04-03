@@ -1,5 +1,5 @@
 
-obj-y += board_base.o misc.o
+obj-y += board_base.o 
 
 obj-$(CONFIG_SOUND) 			+= sound.o
 obj-$(CONFIG_JZ_SPI) 			+= spi_bus.o
