@@ -52,6 +52,9 @@ int set_first_class_disconnect();
 int handle_first_class_disconnect();
 int get_first_class_disconnect();
 int in_depend_network_playmode();
+int set_switch_souce_snd();
+int get_switch_souce_snd();
+int handle_switch_souce_snd();
 
 #define safe_free(p) do{\
     if((p) != NULL)\

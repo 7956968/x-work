@@ -1114,18 +1114,16 @@ void mozart_snd_source_switch(void)
 {
 	snd_source_t source = snd_source;
 
-	mozart_module_stop();
 
-	int cycle_flag = 0;
+	int cycle_count = 0;
 	// find the next snd source.
 	while (1) {
-		source = (source + 1) % SND_SRC_MAX;
-		if (cycle_flag > 0) {
+		if (cycle_count > SND_SRC_MAX+1) {
 			printf("not any music can be play\n");
 			return;
 		}
-		if ( source == snd_source)
-			cycle_flag=1;
+		cycle_count++;
+		source = (source + 1) % SND_SRC_MAX;
 #ifdef SUPPORT_SONG_SUPPLYER
 		if (source == SND_SRC_CLOUD && (get_wifi_mode().wifi_mode != STA || snd_source == SND_SRC_INGENICPLAYER) )
 			continue;
@@ -1149,6 +1147,21 @@ void mozart_snd_source_switch(void)
 			continue;
 		break;
 	}
+	if (snd_source == source) {
+		if (mozart_module_get_play_status() == mozart_module_status_pause) {
+			mozart_play_pause();
+			return;
+		}
+		if (mozart_module_get_play_status() == mozart_module_status_play)
+			return;
+	}
+#ifdef SUPPORT_VR
+	if (mozart_vr_get_status() == VR_ASR) {
+		printf("ASR mode, interrupt it.\n");
+		mozart_vr_asr_break();
+	}
+#endif
+	mozart_module_stop();
 	do_mozart_snd_source_switch(source);
 
 	return;

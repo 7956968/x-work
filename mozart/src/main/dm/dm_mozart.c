@@ -330,6 +330,25 @@ int handle_first_class_disconnect()
 	return 0;	
 }
 
+static int switch_souce_snd = 0;
+int set_switch_souce_snd()
+{
+	switch_souce_snd = 1;
+	return 0;
+}
+
+int get_switch_souce_snd()
+{
+	return switch_souce_snd;
+}
+
+int handle_switch_souce_snd()
+{
+	mozart_snd_source_switch();
+	switch_souce_snd = 0;
+	return 0;	
+}
+
 int in_depend_network_playmode()
 {
 	enum PlayMode mode = get_current_playmode();

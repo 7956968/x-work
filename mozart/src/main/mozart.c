@@ -788,7 +788,7 @@ void miscevent_callback(mozart_event event, void *param)
 					mozart_play_key("tf_remove");
 #if (SUPPORT_LOCALPLAYER == 1)
 					if (get_current_playmode() == PM_UDISK)
-						mozart_snd_source_switch();
+						set_switch_souce_snd();
 #endif
 					udisk_status = 0;
 				}
@@ -808,7 +808,7 @@ void miscevent_callback(mozart_event event, void *param)
 					mozart_ui_localplayer_plugout();
 #if (SUPPORT_LOCALPLAYER == 1)
 					if (get_current_playmode() == PM_SDCARD) {
-						mozart_snd_source_switch();
+						set_switch_souce_snd();
 					}
 #endif
 					tfcard_status = 0;
@@ -1540,7 +1540,7 @@ int network_callback(const char *p)
 			startall(1);
 			//a little bad, fix it.
 			if (in_depend_network_playmode() || mozart_module_get_play_status() == mozart_module_status_stop)
-				mozart_snd_source_switch();
+				set_switch_souce_snd();
 			else
 				if (mozart_module_get_play_status() == mozart_module_status_pause)
 				mozart_play_pause();
@@ -1572,7 +1572,7 @@ int network_callback(const char *p)
 #else
 			startall(1);
 			if (in_depend_network_playmode() || mozart_module_get_play_status() == mozart_module_status_stop)
-				mozart_snd_source_switch();
+				set_switch_souce_snd();
 			else
 				if (mozart_module_get_play_status() == mozart_module_status_pause)
 				mozart_play_pause();
@@ -1886,6 +1886,8 @@ int main(int argc, char **argv)
 				//todo: a little bad, use thread commucation to fix this.
 				if (get_first_class_disconnect() > 0)
 					handle_first_class_disconnect();
+				if (get_switch_souce_snd() > 0)
+					handle_switch_souce_snd();
 				++count;
 				sleep(1);
 #else
