@@ -133,7 +133,7 @@ void *content_wait_func(void *arg)
 
 	pthread_detach(pthread_self());
 
-    while (is_end_flag == false) {
+    while (is_end_flag == false && is_work_flag == true) {
         usleep(1000);
 		timeused++;
 		if (timeused > timeout) {
@@ -224,11 +224,16 @@ void content_stop(void){
 
 void content_interrupt(void){
 	ai_mutex_lock();
+	if (is_work_flag == false)
+		goto out;
+	DEBUG("content interrupt\n");
+		
 	_content_stop();
 	ai_vr_info.from    = VR_FROM_CONTENT;
 	ai_vr_info.content.state = CONTENT_INTERRUPT;
 	if (ai_vr_callback)
 		ai_vr_callback(&ai_vr_info);
+out:
 	ai_mutex_unlock();
 }
 

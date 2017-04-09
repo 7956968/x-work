@@ -8,9 +8,11 @@ extern "C" {
 #ifdef SUPPORT_SONG_SUPPLYER
 	extern int mozart_module_cloud_music_search_and_play(char *key);
 	extern int mozart_module_cloud_music_startup(void);
+	extern int mozart_module_cloud_music_startup2(void);
 #else
 	static inline int mozart_module_cloud_music_search_and_play(char *key) { return 0; }
 	static inline int mozart_module_cloud_music_startup(void) { return 0; }
+	static inline int mozart_module_cloud_music_startup2(void) { return 0; }
 #endif
 
 #ifdef  __cplusplus

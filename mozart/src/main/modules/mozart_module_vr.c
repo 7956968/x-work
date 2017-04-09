@@ -181,6 +181,7 @@ static vr_result_t process_vr_asr_callback(asr_info_t *asr)
 				/* play tts */
 				sprintf(tips, "%s,%s", asr->sds.music.data[index].artist, asr->sds.music.data[index].title);
 				mozart_tts_sync(tips);
+				mozart_module_cloud_music_startup2();
 
 				speech_cloudmusic_playmusic(&asr->sds.music, index);
 				need_resume_after_asr = false;

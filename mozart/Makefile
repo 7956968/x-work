@@ -905,7 +905,7 @@ nw5027lb_ap6212_ubifs_config: unconfig mozart_prepare product_nw5027lb_ap6212_co
 		wifi_ap6212_config bt_ap6212_config bt_hci_dev_ttyS0_config webrtc_aec_enable_config \
 		audio_dev_x1000_config mozart_common_config_vrshort \
 		rootfs_ubifs_config usrdata_ubifs_config flash_spi_gd5f1gq4uby1g_config \
-		ledbreath_enable_config bt_call_resample_enable
+		ledbreath_enable_config bt_call_resample_enable apache_enable_config
 	@echo "Config complete sdk with ubifs for nw5061 ap6212 board"
 #	$(TOPDIR)/device/common/ota/modify_ota_website.sh "public-ota.oss-cn-shenzhen.aliyuncs.com/JZ/downloads/" $(TOPDIR)/device/common/ota/ota.ini
 

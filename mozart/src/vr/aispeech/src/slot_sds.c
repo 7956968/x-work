@@ -209,9 +209,9 @@ void _get_sds_music(json_object *dbdata, sds_music_t *music){
 					}
 				}
 			}
-			DEBUG("[%d].url = %s\n", i, music->data[i].url);
-			DEBUG("[%d].artist = %s\n", i, music->data[i].artist);
-			DEBUG("[%d].title = %s\n", i, music->data[i].title);
+			//DEBUG("[%d].url = %s\n", i, music->data[i].url);
+			//DEBUG("[%d].artist = %s\n", i, music->data[i].artist);
+			//DEBUG("[%d].title = %s\n", i, music->data[i].title);
 		}
 	}
 }

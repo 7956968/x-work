@@ -12,4 +12,5 @@ int dm_get_wifi_mode();
 int dm_switch_sta_by_file();
 int set_eth_ip();
 int add_nat_for_ethlan();
+int dm_switch_sta_by_file();
 #endif

@@ -13,6 +13,9 @@
 #include "mozart_musicplayer.h"
 #include "vr_interface.h"
 #include "dm_mozart.h"
+
+#include "mozart_key_function.h"
+//在调用此函数前要先调用mozart_module_cloud_music_start hzb
 int speech_cloudmusic_playmusic(sds_music_t *music, int index)
 {
 	int i = 0;
@@ -21,11 +24,17 @@ int speech_cloudmusic_playmusic(sds_music_t *music, int index)
 
 	if (!music)
 		return -1;
+	printf("speech_cloudmusic_playmusic %d\n", snd_source);
+	//hzb add.因为有可能:按键切换线程先切到云音乐，正常情况下本线程会执行下面的逻辑。如果在执行下面逻辑前切换线程又切到local音乐，再继续运行下面的逻辑会有问题。所以如果cloud被local挤掉的话，直接退出
+	if (snd_source != SND_SRC_CLOUD) {
+		printf("in local play mode, do not play cloud music\n");
+		return 0;
 
+	}
 	mozart_musicplayer_start(mozart_musicplayer_handler);
+	current_play_domain_change(PM_CLOUD);
 
 	mozart_musicplayer_musiclist_clean(mozart_musicplayer_handler);
-	current_play_domain_change(PM_CLOUD);
 	for (i = 0; i < music->number; i++) {
 		info = mozart_musiclist_get_info(-1,/* songid ignore */
 										 music->data[i].title,

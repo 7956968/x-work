@@ -3,7 +3,6 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <stdarg.h>
-
 #include "event_interface.h"
 #include "utils_interface.h"
 #include "wifi_interface.h"
@@ -934,7 +933,7 @@ int getVersion(xmlNodePtr tag, char *retstr)
 	char* version_flag = NULL;
 	char* project_number = NULL;
 	if ( (project_number = sys_get_projectnum()) == NULL) {
-		false_status(retstr,"cant get project number");
+		//false_status(retstr,"cant get project number");
 		goto out;
 	}
 	version_flag = sys_get_version_flag();
@@ -942,8 +941,10 @@ int getVersion(xmlNodePtr tag, char *retstr)
 		fw_version = sys_get_fwversion2();
 	else 
 		fw_version = sys_get_fwversion();	
-	if (fw_version == NULL)
-		false_status(retstr,"cant get fw version");
+	if (fw_version == NULL) {
+		//false_status(retstr,"cant get fw version");
+		;
+	}
 	else
 		sprintf(retstr,"<Version fw1=\"%s\" fw2=\"%s-%s\"></Version>",FW_1, fw_version, project_number);
 out:
@@ -964,20 +965,20 @@ int getpower(xmlNodePtr tag, char *retstr)
 	if(fh==NULL)
 	{
 		error_num++;
-		sprintf(retstr,"<Return status=\"false\">Get power level error!</Return>");
+//		sprintf(retstr,"<Return status=\"false\">Get power level error!</Return>");
 		return; 
 	}
 	if(ioctl(fh, get_power_level_num, &be) < 0)
 	{
 		error_num++;
-		sprintf(retstr,"<Return status=\"false\">Get power level error!</Return>");
+//		sprintf(retstr,"<Return status=\"false\">Get power level error!</Return>");
 		close(fh);
 		return; 							
 	}
 	if(ioctl(fh,get_Firmware_Edition,&stat)<0)
 	{
 		error_num++;
-		sprintf(retstr,"<Return status=\"false\">Get power status error!</Return>");
+//		sprintf(retstr,"<Return status=\"false\">Get power status error!</Return>");
 		close(fh);
 		return;
 	}
@@ -1351,31 +1352,22 @@ int setWorkMode(xmlNodePtr tag, char *retstr)  //reboot
 {
 	return 0;
 }
+int save_wifi_info(char* ssid, char* pwd)
+{
+	system("touch /tmp/cgi_wifi_info.ini &> /dev/null");
+	if (mozart_ini_setkey("/tmp/cgi_wifi_info.ini", "wifi_info", "ssid", ssid) < 0)
+		mylogstrTofile("set wifi ssid failed\n");
+	if (mozart_ini_setkey("/tmp/cgi_wifi_info.ini", "wifi_info", "pwd", pwd) < 0)
+		mylogstrTofile("set wifi pwd failed\n");
+	return 0;
+}
 int setJoinWireless(xmlNodePtr tag, char *retstr)  //wlan1 disabled=0;network restart
 {
+	mylogstrTofile("%s enter, tag:%s\n", __FUNCTION__, tag);
 	char ssid_bak[64]={0};
 	char password[64]={0};
 	char *pxml=NULL;
 	char *ttag;
-	#if 0
-	char *name=NULL;
-	char *encrypt=NULL;
-	char *tkip_aes=NULL;
-	char *channel=NULL;
-	int channel_num=0;
-	
-	char cur_mode[3]="\0";
-	
-	char encrypt_config[32]="\0";
-	char tkip_aes_config[16]="\0";
-	
-	char str_sp[64]="\0";
-	char str_sp_wifilist[64]="\0";
-
-
-	char uci_option_str[64]="\0";
-	char WiredMode[10]="\0";
-#endif
 	ttag = strstr(tag, JoinWireless_SET_AP);
 	if (!ttag) {
 		mylogstrTofile("%s find tag(JoinWireless_SET_AP) failed\n", __FUNCTION__);
@@ -1385,15 +1377,18 @@ int setJoinWireless(xmlNodePtr tag, char *retstr)  //wlan1 disabled=0;network re
 		mylogstrTofile("%s xmlGetprop(JoinWireless_SET_AP_name) failed\n", __FUNCTION__);
 		goto err;
 	}
+	mylogstrTofile("pxml = %s\n", pxml);
 	char *ntmp = xmldecode(pxml);
 	if( !ntmp || !strlen(ntmp) || strlen(ntmp)>32) {
 		mylogstrTofile("%s invaisld ssid length\n", __FUNCTION__);
 		free(ntmp);
 		goto err;
 	}
+	mylogstrTofile("ntmp = %s\n", ntmp);
 	strncpy(ssid_bak,ntmp,sizeof(ssid_bak)-1);
 	free(ntmp);
 	pxml=NULL;
+	mylogstrTofile("ssid=%s\n", ssid_bak);
 	
 	if((pxml=xmlGetprop(ttag,(const xmlChar*)JoinWireless_SET_AP_password))==NULL) {
 		mylogstrTofile("%s xmlGetprop(JoinWireless_SET_AP_password) failed, may be the wifi is open\n",
@@ -1409,6 +1404,7 @@ int setJoinWireless(xmlNodePtr tag, char *retstr)  //wlan1 disabled=0;network re
 		free(ntmp);
 		pxml=NULL;
 	}
+	mylogstrTofile("password=%s\n", password);
 	
 	//system("set_client.sh >/dev/null 2>&1");
 	if(0 == save_wifi_info(ssid_bak,password))
@@ -1428,213 +1424,17 @@ int setJoinWireless(xmlNodePtr tag, char *retstr)  //wlan1 disabled=0;network re
 		else	
 			mylogstrTofile("Send dm web connected event unsuccessfully.\n");
 	}
+	mylogstrTofile("%s leave\n", __FUNCTION__);
 
 	return 0;
 	
 err:
 	error_num++;
 	strcat(error_info, PARAMETER_ERROR);
+	mylogstrTofile("%s leave\n", __FUNCTION__);
 	return 1;
-#if 0
-	if((pxml=xmlGetprop(ttag,(const xmlChar*)JoinWireless_SET_AP_encrypt))!=NULL)
-	{
-		if((encrypt=(char *)malloc(strlen(pxml)+1))!=NULL)
-		{
-			memset(encrypt,0,strlen(pxml)+1);
-			strcpy(encrypt,pxml);
-			pxml=NULL;
-		}
-	}
-	else
-	{
-		error_num++;
-		strcat(error_info, PARAMETER_ERROR);
-		free(name);
-		free(encrypt);
-		free(password);
-		free(tkip_aes);
-		return 1;
-	}
-	
-	//strcpy(name,xmlGetProp(tag->children,(const xmlChar*)JoinWireless_SET_AP_name));
-	//strcpy(encrypt,xmlGetProp(tag->children,(const xmlChar*)JoinWireless_SET_AP_encrypt));
-	/************************ÐèÒªÐÞ¸Ä************************************/
-	if( strcmp(encrypt,"NONE") )
-	{
-		if((pxml=xmlGetprop(ttag,(const xmlChar*)JoinWireless_SET_AP_password))!=NULL)
-		{
-			if((password=(char *)malloc(strlen(pxml)+1))!=NULL)
-			{
-				memset(password,0,strlen(pxml)+1);
-				strcpy(password,pxml);
-				pxml=NULL;
-			}
-		}
-	}
-		//strcpy(password,xmlGetProp(tag->children,(const xmlChar*)JoinWireless_SET_AP_password));
-	if( !strcmp(encrypt,"WPA-PSK") || !strcmp(encrypt,"WPA2-PSK") || !strcmp(encrypt,"WPA/WPA2-PSK") )
-	{
-		if((pxml=xmlGetprop(ttag,(const xmlChar*)JoinWireless_SET_AP_tkip_aes))!=NULL)
-		{
-			if((tkip_aes=(char *)malloc(strlen(pxml)+1))!=NULL)
-			{
-				memset(tkip_aes,0,strlen(pxml)+1);
-				strcpy(tkip_aes,pxml);
-				pxml=NULL;
-			}
-		}
-		
-	}
-	if( !strlen(name) || strlen(name)>32)
-	{
-		error_num++;
-		strcat(error_info, ERROR_SSID);
-		free(name);
-		free(encrypt);
-		free(password);
-		free(tkip_aes);
-		return 1;
-	}
-
-	if( !strcmp(encrypt,"WPA-PSK") || !strcmp(encrypt,"WPA2-PSK") || !strcmp(encrypt,"WPA/WPA2-PSK") )
-	{
-		if( !strlen(password) || strlen(password)<8 )
-		{
-			error_num++;
-			strcat(error_info,ERROR_PASSWORD);
-			free(name);
-			free(encrypt);
-			free(password);
-			free(tkip_aes);
-			return 1;
-		}
-	}
-	if((pxml=xmlGetprop(ttag,(const xmlChar*)JoinWireless_SET_AP_channel))!=NULL)
-	{
-		if((channel=(char *)malloc(strlen(pxml)+1))!=NULL)
-		{
-			memset(channel,0,strlen(pxml)+1);
-			strcpy(channel,pxml);
-			pxml=NULL;
-		}
-	}
-	
-	printf("Content-type:text/html\r\n\r\n");
-	printf("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
-	printf("<%s><Return status=\"true\" delay=\"20\"></Return></%s>\r\n",SETSYSSTR,SETSYSSTR);
-	fflush(stdout);
-	
-	
-	if(encrypt!=NULL)
-	{
-		if(!strcmp(encrypt,"NONE"))
-			strcpy(encrypt_config,"none");
-		else if(!strcmp(encrypt,"WEP"))
-			strcpy(encrypt_config,"wep");
-		else if(!strcmp(encrypt,"WPA-PSK"))
-			strcpy(encrypt_config,"psk");
-		else if(!strcmp(encrypt,"WPA2-PSK"))
-			strcpy(encrypt_config,"psk2");
-		else if(!strcmp(encrypt,"WPA/WPA2-PSK"))
-			strcpy(encrypt_config,"mixed-psk");
-		else
-			NULL;
-	}
-	
-	if(tkip_aes!=NULL)
-	{
-		if(!strcmp(tkip_aes,"tkip"))
-			strcpy(tkip_aes_config,"tkip");
-		else if(!strcmp(tkip_aes,"aes"))
-			strcpy(tkip_aes_config,"ccmp");
-		else if(!strcmp(tkip_aes,"tkip/aes"))
-			strcpy(tkip_aes_config,"tkip+ccmp");
-		else
-			NULL;
-	}
-
-	if(strlen(name))
-	{
-	    strncpy(ssid_bak,name,sizeof(ssid_bak));
-		//if (mozart_ini_setkey(NETCONFIGPATH, NETCLIENTSECTION, "ssid", name)) {
-		//	printf("Could not write ssid=%s below %s in %s.\n", name, NETCLIENTSECTION, NETCONFIGPATH);
-		//}
-	}
-	if(!strcmp(encrypt_config,"none") || !strcmp(encrypt_config,"wep"))
-	{
-		sprintf(str_sp,"%s",encrypt_config);
-		//sprintf(str_sp_wifilist,"wifisavelist.@wifi-iface[50].encryption=%s",encrypt_config);
-	}
-	else
-	{
-		sprintf(str_sp,"%s+%s",encrypt_config,tkip_aes_config);
-		//sprintf(str_sp_wifilist,"wifisavelist.@wifi-iface[50].encryption=%s+%s",encrypt_config,tkip_aes_config);
-	}
-	if (mozart_ini_setkey(NETCONFIGPATH, NETCLIENTSECTION, "encryption", str_sp)) {
-		printf("Could not write encryption=%s below %s in %s.\n", str_sp, NETCLIENTSECTION, NETCONFIGPATH);
-	}
-	memset(str_sp,0,64);
-	memset(str_sp_wifilist,0,64);
-	if(password!=NULL)
-	{
-		if(strlen(password))
-		{
-			if((name=(char *)malloc(strlen(password)+1))!=NULL)
-			{
-				char *ntmp;
-			
-				memset(name,0,strlen(password)+1);
-				ntmp = xmldecode(password);
-				strcpy(name,ntmp);
-				free(ntmp);
-			}
-			if (mozart_ini_setkey(NETCONFIGPATH, NETCLIENTSECTION, "key", password)) {
-				printf("Could not write key=%s below %s in %s.\n", password, NETCLIENTSECTION, NETCONFIGPATH);
-			}
-			memset(str_sp,0,64);
-			memset(str_sp_wifilist,0,64);
-		}
-	}
-
-	if(channel!=NULL)
-	{
-		if(strlen(channel))
-		{
-			if (mozart_ini_setkey(NETCONFIGPATH, NETRADIOSECTION, "channel", channel)) {
-				printf("Could not write channel=%s below %s in %s.\n", channel, NETRADIOSECTION, NETCONFIGPATH);
-			}
-		}
-	}
-	system("touch /tmp/wifi_client_is_connecting");
-
-	if(name)
-	    free(name);
-	if(encrypt)
-	    free(encrypt);
-	if(password)
-	    free(password);
-	if(tkip_aes)
-	    free(tkip_aes);
-	if(channel)
-	    free(channel);
-	if(pxml)
-	    free(pxml);
-
-	system("rm -f /tmp/wifi_client_is_connecting");
-	
-#endif
-
 }
 
-int save_wifi_info(const char* ssid, const char* pwd)
-{
-	system("touch /tmp/cgi_wifi_info.ini &> /dev/null");
-	if (mozart_ini_setkey("/tmp/cgi_wifi_info.ini", "wifi_info", "ssid", ssid) < 0)
-		mylogstrTofile("set wifi ssid failed\n");
-	if (mozart_ini_setkey("/tmp/cgi_wifi_info.ini", "wifi_info", "pwd", pwd) < 0)
-		mylogstrTofile("set wifi pwd failed\n");
-	return 0;
-}
 
 int setJoinWired(xmlNodePtr tag, char *retstr)  //wlan1 disabled=1;network restart
 {

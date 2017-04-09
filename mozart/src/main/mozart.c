@@ -340,9 +340,10 @@ void tfcard_scan_done_callback(char *musiclist)
 			printf("find music in sdcard\n");
 			tfcard_status = 1;
 		}
-		else if( (strstr(musiclist, "\\/mnt\\/usb\\/")) != NULL) 
+		else if( (strstr(musiclist, "\\/mnt\\/usb\\/")) != NULL) {
 			printf("find music in udisk\n");
 			udisk_status = 1;
+		}
 	}
 	//tfcard_status = 1;
 	mozart_module_local_music_startup();
@@ -712,9 +713,9 @@ void keyevent_callback(mozart_event event, void *param)
 				break;
 			case KEY_MENU:
 				if (first_class_playing()) 
-					first_class_key_switch_source();
+					set_first_class_disconnect();
 				else
-					mozart_snd_source_switch();
+					set_switch_souce_snd();
 				break;
 			case KEY_F3:            /* music music Shortcut key 1 */
 				//HZB comment this statement because it will cause dead lock
@@ -1325,8 +1326,10 @@ void miscevent_callback(mozart_event event, void *param)
 #if 1
 		else if (!strcasecmp(event.event.misc.name, "dm")) {
 			if (!strcasecmp(event.event.misc.type, "web_conn")) {
-				mozart_module_pause();
-				dm_switch_sta_by_file();
+				mozart_module_stop();
+				stopall(1);
+				if (!get_airkissing())
+					dm_switch_sta_by_file();
 			}
 			#if 0
 			else if (!strcasecmp(event.event.misc.type, "web_disconn")) {
@@ -1340,6 +1343,7 @@ void miscevent_callback(mozart_event event, void *param)
 		else {
 			printf("Unhandle event: %s-%s.\n", event.event.misc.name, event.event.misc.type);
 		}
+		
 		break;
 	case EVENT_KEY:
 	default:
@@ -1733,7 +1737,7 @@ void *mozart_updater_check_version(void *arg)
 int main(int argc, char **argv)
 {
 	int daemonize = 0;
-	printf("mozart 3\n");
+	printf("mozart 4\n");
 	app_name = argv[0];
 	wifi_ctl_msg_t new_mode;
 	struct wifi_client_register wifi_info;

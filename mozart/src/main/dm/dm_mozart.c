@@ -2,12 +2,17 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <linux/input.h>
 
 #include "tips_interface.h"
 #include "dm6291_led.h"
 #include "ini_interface.h"
 #include "mozart_key_function.h"
 #include "dm_mozart.h"
+
+#ifdef SUPPORT_VR
+#include "modules/mozart_module_vr.h"
+#endif
 
 volatile static int g_busy_flag = 0;
 volatile static int g_airkissing = 0;
@@ -246,10 +251,22 @@ int dm_key_releaseed(int code)
 	return 0;
 }
 
+int interrupt_contentget_and_vrasr()
+{
+	mozart_vr_content_get_interrupt();
+	if (mozart_vr_get_status() == VR_ASR) {
+		printf("ASR mode, interrupt\n");
+		mozart_vr_asr_break();
+	}
+	return 0;
+}
+
 int dm_key_pressed(int code)
 {
 	g_touch = 1;
 	update_led_status();
+	if (code != KEY_VOLUMEUP && code != KEY_VOLUMEDOWN && code != KEY_MENU && code != KEY_PLAYPAUSE) //忽略KEY_MENU 按键，因为模式切换有可能不会退出云音乐播放，所以不能打断contentget; 在模式切换的逻辑执行打断
+		interrupt_contentget_and_vrasr();
 	return 0;
 }
 

@@ -71,18 +71,18 @@ int mozart_module_cloud_music_search_and_play(char *key)
 /* TODO: cache url */
 int mozart_module_cloud_music_startup(void)
 {
-	char buf[1024] = {};
+//	char buf[1024] = {};
 	int idx = random() % (sizeof(artists) / sizeof(artists[0]));
 
 	if (mozart_module_cloud_music_start())
 		return -1;
+	current_play_domain_change(PM_CLOUD);
 	mozart_play_key("cloud_mode");
 
-	sprintf(buf, "欢迎回来，为您播放%s的歌", artists[idx]);
-	mozart_tts(buf);
-	mozart_tts_wait();
+	//sprintf(buf, "欢迎回来，为您播放%s的歌", artists[idx]);
+	//mozart_tts(buf);
+	//mozart_tts_wait();
 	printf("bbb\n");
-	current_play_domain_change(PM_CLOUD);
 #if (SUPPORT_SONG_SUPPLYER == SONG_SUPPLYER_XIMALAYA)
 	return ximalaya_cloudmusic_play(artists[idx]);
 #elif (SUPPORT_SONG_SUPPLYER == SONG_SUPPLYER_LAPSULE)
@@ -96,5 +96,13 @@ int mozart_module_cloud_music_startup(void)
 	return 0;
 #endif
 }
+
+int mozart_module_cloud_music_startup2(void)
+{
+	mozart_module_cloud_music_start();
+	return 0;
+}
+
+
 
 #endif	/* SUPPORT_SONG_SUPPLYER */

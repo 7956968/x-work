@@ -43,6 +43,8 @@
 #include "modules/mozart_module_cloud_music.h"
 #include "modules/mozart_module_local_music.h"
 
+#include "dm_mozart.h"
+
 // keyvalue2str for EV_KEY, ONLY for debug.
 char *keyvalue_str[] = {
 	[0] = "Released",
@@ -1129,9 +1131,11 @@ void mozart_snd_source_switch(void)
 			continue;
 #endif
 #if (SUPPORT_LOCALPLAYER == 1)
-		if (source == SND_SRC_LOCALPLAY &&
+		if (source == SND_SRC_LOCALPLAY && 
 		    (tfcard_status == 0 || tfcard_status == -1) && udisk_status != 1)
 			continue;
+		if (source == SND_SRC_LOCALPLAY)
+			printf("tf(%d) udisk(%d)\n", tfcard_status, udisk_status);
 #endif
 //HZB disable bt,because it may cause some problem
 #if (SUPPORT_BT == BT_BCM)
@@ -1155,13 +1159,9 @@ void mozart_snd_source_switch(void)
 		if (mozart_module_get_play_status() == mozart_module_status_play)
 			return;
 	}
-#ifdef SUPPORT_VR
-	if (mozart_vr_get_status() == VR_ASR) {
-		printf("ASR mode, interrupt it.\n");
-		mozart_vr_asr_break();
-	}
-#endif
+	interrupt_contentget_and_vrasr();
 	mozart_module_stop();
+	mozart_musicplayer_stop(mozart_musicplayer_handler);//有可能domain为none，但是musicplayer的handler不是invaild，所以这里要先stop musicplayer，否则无法切换到其他模式
 	do_mozart_snd_source_switch(source);
 
 	return;

@@ -176,6 +176,38 @@ int check_wire()
 }
 #endif
 
+int stop_wifi_mode(void)
+{	
+	wifi_ctl_msg_t stop_wifi;
+	memset(&stop_wifi, 0, sizeof(wifi_ctl_msg_t));
+	stop_wifi.cmd = STOP_WIFI;
+	request_wifi_mode(stop_wifi);	
+	return 0;
+}
+
+int stop_wifi_mode_and_clear(void)
+{	
+	stop_wifi_mode();	
+	system("echo \"ctrl_interface=/var/run/wpa_supplicant\" > /usr/data/wpa_supplicant.conf");	
+	system("echo \"ap_scan=1\" >> /usr/data/wpa_supplicant.conf");
+	return 0;
+}
+
+void create_wifi_info(const char *ssid, const char *psk, int priority)
+{	
+	char cmd[128];
+	system("echo \"network={\" >> /usr/data/wpa_supplicant.conf");
+	system("echo \"scan_ssid=1\" >> /usr/data/wpa_supplicant.conf");	
+	sprintf(cmd, "echo \"ssid=\\\"%s\\\"\" >> /usr/data/wpa_supplicant.conf", ssid);	
+	system(cmd);
+	snprintf(cmd, 128, "echo \"psk=\"%s\"\" >> /usr/data/wpa_supplicant.conf", psk);
+	system(cmd);
+	system("echo \"bssid=\" >> /usr/data/wpa_supplicant.conf");	snprintf(cmd, 128, "echo \"priority=%d\" >> /usr/data/wpa_supplicant.conf", priority);	
+	system(cmd);	
+	system("echo \"}\" >> /usr/data/wpa_supplicant.conf");
+}
+
+
 extern char* app_name;
 int dm_wifi_mode_switch(int cmd) 
 {
@@ -184,24 +216,17 @@ int dm_wifi_mode_switch(int cmd)
 	new_mode.cmd = cmd;
 	new_mode.force = true;
 	strcpy(new_mode.name, app_name);
-	//if (cmd == SW_STA)
-	//	new_mode.param.network_config.timeout = -1;		
+	if (cmd == SW_STA)
+		new_mode.param.switch_sta.sta_timeout = 60;		
 	if(request_wifi_mode(new_mode) != true)
 		printf("ERROR: [%s] Request Network Failed, Please Register First!!!!\n", app_name);
 	return 0;
 }
 int dm_switch_sta_by_ssid(const char* ssid, const char* pwd) 
 {
-	wifi_ctl_msg_t new_mode;
-	memset(&new_mode, 0, sizeof(new_mode));
-	new_mode.cmd = SW_STA;	
-	new_mode.param.switch_sta.sta_timeout = 60;
-	strncpy(new_mode.param.switch_sta.ssid, ssid, 64);
-	strncpy(new_mode.param.switch_sta.psk, pwd, 128);
-	new_mode.force = true;
-	strcpy(new_mode.name, app_name);	
-	if(request_wifi_mode(new_mode) != true)
-		printf("ERROR: [%s] Request Network Failed, Please Register First!!!!\n", app_name);
+	stop_wifi_mode_and_clear();
+	create_wifi_info(ssid, pwd, 1);
+	dm_wifi_mode_switch(SW_STA);
 	return 0;
 }
 
