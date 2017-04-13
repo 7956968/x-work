@@ -1,6 +1,6 @@
 {
   "name": "mozart",
-  "version": "1.9.10",
+  "version": "1.9.11",
   "description": "Ingenic Speaker Mozart",
   "scripts": {
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -w -s",

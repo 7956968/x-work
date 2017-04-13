@@ -1,5 +1,4 @@
 #include <linux/platform_device.h>
-
 #include <linux/input.h>
 #include <mach/jzgpio_keys.h>
 #include <linux/input/matrix_keypad.h>
@@ -83,7 +82,7 @@ static struct jz_gpio_keys_button board_longbuttons[] = {
                 .gpio                           = GPIO_KEY_PALYPAUSE,
                 .code = {
                         .shortpress_code        = KEY_PLAYPAUSE,
-                        .longpress_code         = KEY_NEXTSONG,
+                        .longpress_code         = KEY_RESERVED,
                 },
                 .desc                           = "KEY1 OF NW5027 P3",
                 .active_low                     = ACTIVE_LOW_NW5027_P3_KEY,

@@ -512,7 +512,7 @@ static void volume_up_handler(bool long_press)
 	else
 		mozart_volume_up();
 }
-
+#if 0
 static void play_pause_handler(bool long_press)
 {
 	if (long_press)
@@ -520,7 +520,7 @@ static void play_pause_handler(bool long_press)
 	else
 		mozart_play_pause();
 }
-
+#endif
 static struct input_event_key_info input_event_key_infos[] = {
 	//HZB
 	#if 0
@@ -549,6 +549,7 @@ static struct input_event_key_info input_event_key_infos[] = {
 		.timeout_second = 1,
 		.handler = volume_down_handler,
 	},
+	/*
 	{
 		.name = "play_pause_key",
 		.key_code = KEY_PLAYPAUSE,
@@ -556,7 +557,7 @@ static struct input_event_key_info input_event_key_infos[] = {
 		.cond = PTHREAD_COND_INITIALIZER,
 		.timeout_second = 1,
 		.handler = play_pause_handler,
-	},
+	},*/
 };
 
 static void *key_long_press_func(void *args)
@@ -701,6 +702,9 @@ void keyevent_callback(mozart_event event, void *param)
 				break;
 			case KEY_MODE:
 				create_wifi_switch_pthread();
+				break;
+			case KEY_PLAYPAUSE:
+				mozart_play_pause();
 				break;
 			case KEY_BLUETOOTH:
 				key_bluetooth_handler();
