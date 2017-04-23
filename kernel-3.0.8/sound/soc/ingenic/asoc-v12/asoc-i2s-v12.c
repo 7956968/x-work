@@ -135,7 +135,6 @@ struct clk {
 	struct clk *source;
 };
 
-
 static int calculate_exact_div(unsigned long pll, unsigned long clk, unsigned int div)
 {
 	/* sysclk = (256 or 128) * sync */
@@ -161,11 +160,12 @@ static unsigned long calculate_cgu_aic_rate(struct clk *cgu_aic_clk  ,unsigned l
 		8000, 11025, 12000, 16000,22050,24000,
 		32000,44100, 48000, 88200,96000,192000, 384000,
 	};
-
-	/* sysclk_div = sysclk / sync
+	/* 
+	 * For jz4775, we should use two PLL as the I2S clk source to get exactlly clk. 
+	 * sysclk_div = sysclk / sync
 	 * You can change it just follow your board.
 	 * Now 4775 apll set to 948MHZ, mpll set to 492MHZ, sysclk_div[] is calculated refer to it.
-	 * If you change pll clk, you should reset it again.
+	 * If you change the pll clk, you should check the code again.
 	*/
 	unsigned int sysclk_div[13] = {
 		256, 256, 256, 256, 256, 256,

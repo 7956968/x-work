@@ -49,6 +49,7 @@ extern int mozart_stop_tone(void);
 extern int mozart_play_tone_sync(char *mp3_src);
 extern int mozart_stop_tone_sync(void);
 
+extern int mozart_usb_audio_is_in();
 #ifdef  __cplusplus
 }
 #endif

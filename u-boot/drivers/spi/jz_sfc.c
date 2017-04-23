@@ -1043,6 +1043,14 @@ unsigned int get_update_flag()
 	return update_flag;
 }
 
+void *get_nvinfo(void)
+{
+	nvinfo_t *nvinfo = (nvinfo_t *)CONFIG_SPL_NV_BASE;
+	sfc_nor_read(NV_AREA_BASE_ADDR, sizeof(nvinfo_t), nvinfo);
+
+	return nvinfo;
+}
+
 int get_battery_flag(void)
 {
 	unsigned char buf [64];

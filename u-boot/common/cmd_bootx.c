@@ -267,54 +267,62 @@ static void sfc_boot(unsigned int mem_address,unsigned int sfc_addr)
 #endif
 
 #ifdef CONFIG_JS1_BOARD
-	if (gpio_get_value(86)) {
-		lcd_enable();
-		lcd_display_bat_cap_first(0);
-		mdelay(2000);
-		lcd_disable();
-		jz_hibernate();
-	}
-	gpio_port_direction_input(1,31);
-	gpio_port_direction_input(2,22);
-	while (!(gpio_get_value(86))) {
-		keyproc();
-		if (alarm == 1)
-			goto time_out;
-		if (bat_cap != calc_battery_capacity()) {
-			bat_cap = calc_battery_capacity();
-			line = get_line_count();
-		}
+	unsigned int update_flag;
+	nvinfo_t *nvinfo = NULL;
 
-		if (first && bat_cap == 100) {
+	nvinfo = get_nvinfo();
+
+	if((nvinfo->update_flag != FLAG_UPDATE) && (nvinfo->update_process != PROCESS_2)) {
+		if (gpio_get_value(86)) {
 			lcd_enable();
-			lcd_display_bat_cap_first(100);
-			mdelay(100);
+			lcd_display_bat_cap_first(0);
+			mdelay(2000);
 			lcd_disable();
-		} else {
-			lcd_enable();
-			lcd_display_zero_cap();
-			mdelay(100);
+			jz_hibernate();
+		}
+		gpio_port_direction_input(1,31);
+		gpio_port_direction_input(2,22);
+
+		while (!(gpio_get_value(86))) {
 			keyproc();
 			if (alarm == 1)
 				goto time_out;
-			if (line < 5)
-				line = 5;
-			display_battery_capacity(line);
-			mdelay(100);
-			lcd_disable();
-			if (bat_cap == 100)
-				first = 1;
-			else
-				first = 0;
+			if (bat_cap != calc_battery_capacity()) {
+				bat_cap = calc_battery_capacity();
+				line = get_line_count();
+			}
+
+			if (first && bat_cap == 100) {
+				lcd_enable();
+				lcd_display_bat_cap_first(100);
+				mdelay(100);
+				lcd_disable();
+			} else {
+				lcd_enable();
+				lcd_display_zero_cap();
+				mdelay(100);
+				keyproc();
+				if (alarm == 1)
+					goto time_out;
+				if (line < 5)
+					line = 5;
+				display_battery_capacity(line);
+				mdelay(100);
+				lcd_disable();
+				if (bat_cap == 100)
+					first = 1;
+				else
+					first = 0;
+			}
+			if (alarm == 1)
+				goto time_out;
 		}
-		if (alarm == 1)
-			goto time_out;
-	}
 time_out:
-	if(gpio_get_value(86)){
-		printf("usb have remove ,power off!!!\n");
-		//call ricoh-618 power off
-		jz_hibernate();
+		if(gpio_get_value(86)){
+			printf("usb have remove ,power off!!!\n");
+			//call ricoh-618 power off
+			jz_hibernate();
+		}
 	}
 #endif
 	printf("Enter SFC_boot routine ...\n");

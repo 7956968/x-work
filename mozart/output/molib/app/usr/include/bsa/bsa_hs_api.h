@@ -14,7 +14,8 @@
 
 /* for tBSA_STATUS */
 #include "bsa_status.h"
-
+#include "bsa_sec_api.h"
+#include "uipc.h"
 #include "bta_hs_api.h"
 
 /*****************************************************************************

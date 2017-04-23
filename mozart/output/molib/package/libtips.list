@@ -62,3 +62,5 @@ output/molib/app/usr/share/vr/tone/wifi_linking.mp3
 output/molib/app/usr/share/vr/tone/native_asr_failed.mp3
 output/molib/app/usr/share/vr/tone/resume.mp3
 output/molib/app/usr/share/vr/tone/volume_down.mp3
+output/molib/app/usr/share/vr/tone/wifi_link_wrongkey.mp3
+

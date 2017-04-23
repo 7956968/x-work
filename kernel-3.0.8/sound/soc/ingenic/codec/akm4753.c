@@ -28,7 +28,7 @@
 #include <linux/gpio.h>
 #include "akm4753.h"
 
-//#define  USE_ALL_GAIN_RANGE	1
+//#define  USE_GAIN_FULL_RANGE
 
 /* codec private data */
 struct akm4753_priv {
@@ -350,7 +350,7 @@ static const struct soc_enum akm4753_enum[] = {
 };
 
 /* unit: 0.01dB */
-#ifdef USE_ALL_GAIN_RANGE
+#ifdef USE_GAIN_FULL_RANGE
 /* If you want to use full gain range:-127dB ~ 0dB, you can enable the code */
 static const DECLARE_TLV_DB_SCALE(dac_tlv, -12700, 50, 1);
 #else
@@ -366,7 +366,7 @@ static const DECLARE_TLV_DB_SCALE(dac_tlv, -3000, 50, 0);
 #endif
 
 static const struct snd_kcontrol_new akm4753_snd_controls[] = {
-#ifdef USE_ALL_GAIN_RANGE
+#ifdef USE_GAIN_FULL_RANGE
 	/* If you want to use full gain range:-127dB ~ 0dB, you can enable the code */
 	SOC_DOUBLE_R_TLV("Master Playback Volume", LCH_DIGITAL_VOLUME, RCH_DIGITAL_VOLUME, 0, 0xff, 1, dac_tlv),
 #else
@@ -632,8 +632,32 @@ static ssize_t akm4753_regs_show(struct device *dev,
         return 0;
 }
 
+/* The codec register write interface is just for debug. */
+#define AKM4753_REG_SUM         0x7d
+static ssize_t akm4753_regs_write(struct device *dev, struct device_attribute *attr,
+                const char *buf, size_t n)
+{
+        int ret;
+        char * buf_2;
+        unsigned char reg_addr, reg_val;
+
+        reg_addr  = (unsigned char)simple_strtoul(buf, &buf_2, 0);
+        buf_2 = skip_spaces(buf_2);
+        reg_val = (unsigned char)simple_strtoul(buf_2, NULL, 0);
+
+        if (reg_addr > AKM4753_REG_SUM)
+                return -EINVAL;
+
+        printk("\nwrite reg: 0x%x 0x%x\n", reg_addr, reg_val);
+
+        ret = akm4753_i2c_write_regs(reg_addr, &reg_val, 1);
+        if (ret)
+                printk("write reg fail\n");
+        return n;
+}
+
 static struct device_attribute akm4753_sysfs_attrs = 
-        __ATTR(akm4753_regs, S_IRUGO, akm4753_regs_show, NULL);
+	__ATTR(akm4753_regs, S_IRUGO | S_IWUSR, akm4753_regs_show, akm4753_regs_write);
 
 static int akm4753_probe(struct snd_soc_codec *codec)
 {

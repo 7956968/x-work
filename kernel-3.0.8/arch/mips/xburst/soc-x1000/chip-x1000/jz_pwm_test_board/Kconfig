@@ -7,11 +7,15 @@ config BOARD_X1000_JZ_PWM_TEST_BOARD_V10
 bool "board x1000 jz_pwm_test_board v10"
 depends on PRODUCT_X1000_JZ_PWM_TEST_BOARD
 
+config BOARD_X1000_JZ_PWM_TEST_BOARD_V20
+bool "board x1000 jz_pwm_test_board v20"
+depends on PRODUCT_X1000_JZ_PWM_TEST_BOARD
 endchoice
 
 config BOARD_NAME
 string
 default "jz_pwm_test_board_v10" if BOARD_X1000_JZ_PWM_TEST_BOARD_V10
+default "jz_pwm_test_board_v20" if BOARD_X1000_JZ_PWM_TEST_BOARD_V20
 
 
 

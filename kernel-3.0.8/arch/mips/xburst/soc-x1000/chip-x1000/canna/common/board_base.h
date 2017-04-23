@@ -14,6 +14,11 @@ extern struct platform_device akm4345_spi_device;
 extern struct akm4345_platform_data akm4345_spi_data;
 #endif
 
+#ifdef CONFIG_NPCA110P_EXTERNAL_CODEC
+extern struct platform_device npca110p_codec_device;
+extern struct snd_codec_data npca110p_codec_data;
+#endif
+
 #ifdef CONFIG_JZMMC_V12_MMC0
 extern struct jzmmc_platform_data tf_pdata;
 #endif
@@ -55,6 +60,10 @@ extern struct platform_device	bluesleep_device;
 #endif
 
 #ifdef CONFIG_BCM_AP6212_RFKILL
+extern struct platform_device   bt_power_device;
+#endif
+
+#ifdef CONFIG_BCM_AP6255_RFKILL
 extern struct platform_device   bt_power_device;
 #endif
 

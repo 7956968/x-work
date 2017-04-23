@@ -18,6 +18,10 @@ extern struct akm4345_platform_data akm4345_spi_data;
 extern struct platform_device tas5010_device;
 extern struct snd_codec_data tas5010_codec_data;
 #endif
+#ifdef CONFIG_ES8374_EXTERNAL_CODEC
+extern struct platform_device es8374_device;
+extern struct snd_codec_data es8374_codec_data;
+#endif
 
 
 #ifdef CONFIG_JZMMC_V12_MMC0

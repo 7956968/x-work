@@ -124,7 +124,7 @@ endif
 ifeq ("$(call substring,$(BT),1,3)", "rtk") # realtek's bt module.
 endif
 ifeq ("$(call substring,$(BT),1,3)", "bcm") # broadcom's bt module.
-LDFLAGS += -lbsa -lbt -lappcommon -lchannels
+LDFLAGS += -lbsa -lbt -lappcommon -lchannels -lrecord
 endif
 
 ifeq ($(INGENICPLAYER),1)
@@ -208,7 +208,7 @@ clean:
 	-rm -rf $(OBJS) $(TARGET)
 
 uninstall:
-	if [ -e $(DESTDIR)$(SBINDIR)/$(TARGET)]; then \
+	if [ -e $(DESTDIR)$(SBINDIR)/$(TARGET) ]; then \
 		rm -rf $(DESTDIR)$(SBINDIR)/$(TARGET); \
 		rm -rf $(DESTDIR)$(INITDIR)/S10mozart.sh; \
 	fi

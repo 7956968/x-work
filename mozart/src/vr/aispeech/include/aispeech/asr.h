@@ -246,7 +246,10 @@ typedef struct sem_music_t {
 	 * @brief volume 音量.
 	 */
 	char *volume;
-
+	/**
+	 * @brief tgt request tgt.
+	 */
+	char *tgt;
 }sem_music_t;
 
 
@@ -893,9 +896,10 @@ typedef struct asr_info_t {
 
 /**
  * @brief asr_start 启动识别引擎.
+ * @param sds [in] 是否是一个多轮对话
  * @return 返回结果： 0 成功， -1：异常失败.
  */
-extern int asr_start(void);
+extern int asr_start(bool sds);
 
 /**
  * @brief asr_stop 停止识别引擎.

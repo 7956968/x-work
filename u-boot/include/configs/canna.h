@@ -83,7 +83,6 @@
 #define CONFIG_MDDR_EMD56164PC_50I
 #endif
 
-#define CONFIG_AUDIO_CAL_DIV
 #define CONFIG_AUDIO_APLL CONFIG_SYS_APLL_FREQ
 #define CONFIG_AUDIO_MPLL CONFIG_SYS_MPLL_FREQ
 
@@ -109,15 +108,16 @@
 #define WIFI_MAC_READ_COUNT	12
 #endif
 
+#define CONFIG_CHECK_SOCID
 /**
  * common boot arguments definitions.
  */
 #if defined CONFIG_128MB_LPDDR
-#define BOOTARGS_BASE "console=ttyS2,57600n8 consoleblank=0 mem=128M "
+#define BOOTARGS_BASE "console=ttyS2,57600n8 consoleblank=0 mem=128M lpj=5009408"
 #elif defined CONFIG_64MB_LPDDR
-#define BOOTARGS_BASE "console=ttyS2,57600n8 consoleblank=0 mem=64M "
+#define BOOTARGS_BASE "console=ttyS2,57600n8 consoleblank=0 mem=64M lpj=5009408"
 #else
-#define BOOTARGS_BASE "console=ttyS2,57600n8 consoleblank=0 mem=32M "
+#define BOOTARGS_BASE "console=ttyS2,57600n8 consoleblank=0 mem=32M lpj=5009408"
 #endif
 
 #if defined CONFIG_GET_WIFI_MAC

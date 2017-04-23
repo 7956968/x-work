@@ -11,7 +11,7 @@
 /**
  * @brief 是否显示所有DEBUG打印信息
  */
-//#define DEBUG_SHOW_ALL
+/* #define DEBUG_SHOW_ALL */
 
 
 #define DEBUG(format, ...) printf("[%s : %s : %d] ",__FILE__,__func__,__LINE__); printf(format, ##__VA_ARGS__);

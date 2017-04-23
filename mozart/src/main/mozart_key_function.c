@@ -1159,7 +1159,7 @@ void mozart_snd_source_switch(void)
 		if (mozart_module_get_play_status() == mozart_module_status_play)
 			return;
 	}
-	interrupt_contentget_and_vrasr();
+	interrupt_vrasr();
 	mozart_module_stop();
 	mozart_musicplayer_stop(mozart_musicplayer_handler);//有可能domain为none，但是musicplayer的handler不是invaild，所以这里要先stop musicplayer，否则无法切换到其他模式
 	do_mozart_snd_source_switch(source);
@@ -1298,7 +1298,7 @@ void mozart_volume_up(void)
 			}
 			printf("set avk dsp %d, set phone %d\n", avk_volume_set_dsp[i], avk_volume_set_phone[i]);
 			mozart_volume_set(avk_volume_set_dsp[i], BT_MUSIC_VOLUME);
-			mozart_bluetooth_avk_set_volume_up(avk_volume_set_phone[i]);
+			mozart_bluetooth_avk_set_volume(avk_volume_set_phone[i]);
 		}
 		break;
 #endif
@@ -1413,7 +1413,7 @@ void mozart_volume_down(void)
 			printf("set avk dsp %d, set phone %d\n", avk_volume_set_dsp[i], avk_volume_set_phone[i]);
 
 			mozart_volume_set(avk_volume_set_dsp[i], BT_MUSIC_VOLUME);
-			mozart_bluetooth_avk_set_volume_down(avk_volume_set_phone[i]);
+			mozart_bluetooth_avk_set_volume(avk_volume_set_phone[i]);
 		}
 		break;
 #endif
@@ -1523,7 +1523,7 @@ void mozart_refresh_volume(void)
 			}
 			printf("set avk dsp %d, set phone %d\n", avk_volume_set_dsp[i], avk_volume_set_phone[i]);
 			mozart_volume_set(avk_volume_set_dsp[i], BT_MUSIC_VOLUME);
-			mozart_bluetooth_avk_set_volume_up(avk_volume_set_phone[i]);
+			mozart_bluetooth_avk_set_volume(avk_volume_set_phone[i]);
 		}
 		break;
 #endif
@@ -1532,6 +1532,28 @@ void mozart_refresh_volume(void)
 		break;
 	}
 }
+
+#if (SUPPORT_USB_AUDIO == 1)
+void mozart_usb_audio_plug_in(void)
+{
+	mozart_module_stop();
+	stopall(1);
+	mozart_ini_setkey("/usr/data/system.ini","usb_audio","use_usb_audio","0");
+	mozart_play_key_sync("linein_mode");
+	mozart_ini_setkey("/usr/data/system.ini","usb_audio","use_usb_audio","1");
+	stopall(0);
+	system("insmod /usr/fs/modules/g_audio.ko");
+}
+
+void mozart_usb_audio_plug_out(void)
+{
+	system("rmmod g_audio");
+	mozart_play_key("linein_off");
+	startall(0);
+	startall(1);
+}
+
+#endif
 
 static bool linein_is_active;
 

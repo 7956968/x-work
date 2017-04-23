@@ -77,7 +77,7 @@ static const char *sds_conf =
         \"strip\": 1\
     },\
     \"cloud\": {\
-		\"server\": \"ws://s-test.api.aispeech.com:10000\"\
+		\"server\": \"ws://s.api.aispeech.com:10000\"\
     }\
 }";
 #else
@@ -99,7 +99,7 @@ static const char *sds_conf ="{"
             "\"strip\":1"
         "},"
         "\"cloud\":{"
-            "\"server\":\"ws://s-test.api.aispeech.com:10000\""
+            "\"server\":\"ws://s.api.aispeech.com:10000\""
         "}"
     "}";
 

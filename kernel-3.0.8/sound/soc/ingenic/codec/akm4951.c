@@ -29,7 +29,11 @@
 
 #include "akm4951.h"
 
-//#define  USE_ALL_GAIN_RANGE	1
+#define HPL_HPR_REPLAY
+//#define LOUT_ROUT_REPLAY
+//#define SPP_SPN_REPLAY
+
+//#define USE_GAIN_FULL_RANGE
 
 /* codec private data */
 struct akm4951_priv {
@@ -42,6 +46,7 @@ struct akm4951_priv {
 
 static unsigned char power_reg0;
 static unsigned char power_reg1;
+static unsigned char power_reg2;
 static unsigned long user_replay_rate = 0;
 
 //static const u8 akm4951_reg[] = { };
@@ -320,6 +325,7 @@ static const char *akm4951_eq3_switch[] = {"DISABLE", "ENABLE"};
 static const char *akm4951_eq4_switch[] = {"DISABLE", "ENABLE"};
 static const char *akm4951_eq5_switch[] = {"DISABLE", "ENABLE"};
 static const char *akm4951_wind_noise_reduct_switch[] = {"DISABLE", "ENABLE"};
+static const char *akm4951_i2s_dout_signal_select[] = {"ADC OUT", "PROGRAM FILTER OUT"};
 
 static const struct soc_enum akm4951_enum[] = {
 	SOC_ENUM_SINGLE(ALC_MODE_CONTROL, 5, 2, akm4951_alc_switch),
@@ -330,10 +336,11 @@ static const struct soc_enum akm4951_enum[] = {
 	SOC_ENUM_SINGLE(DIGITAL_FILTER_SELECT, 3, 2, akm4951_eq4_switch),
 	SOC_ENUM_SINGLE(DIGITAL_FILTER_SELECT, 4, 2, akm4951_eq5_switch),
 	SOC_ENUM_SINGLE(AUTO_HPF_CONTROL, 5, 2, akm4951_wind_noise_reduct_switch),
+	SOC_ENUM_SINGLE(DIGITAL_FILTER_MODE, 0, 2, akm4951_i2s_dout_signal_select),
 };
 
 /* unit: 0.01dB */
-#ifdef USE_ALL_GAIN_RANGE
+#ifdef USE_GAIN_FULL_RANGE
 /* If you want to use full gain range:-90dB ~ +12dB, you can enable the code */
 static const DECLARE_TLV_DB_SCALE(dac_tlv, -9000, 50, 1);
 #else
@@ -345,7 +352,7 @@ static const DECLARE_TLV_DB_SCALE(dac_tlv, -3000, 50, 0);
 static const DECLARE_TLV_DB_SCALE(adc_tlv, -5250, 37, 1);
 
 static const struct snd_kcontrol_new akm4951_snd_controls[] = {
-#ifdef USE_ALL_GAIN_RANGE
+#ifdef USE_GAIN_FULL_RANGE
 	/* If you want to use full gain range:-90dB ~ +12dB, you can enable the code */
 	SOC_DOUBLE_R_TLV("Master Playback Volume", LCH_DIGITAL_VOLUME, RCH_DIGITAL_VOLUME, 0, 0xcc, 1, dac_tlv),
 #else
@@ -354,6 +361,7 @@ static const struct snd_kcontrol_new akm4951_snd_controls[] = {
 	INGENIC_SOC_DOUBLE_R_TLV("Adc Volume", LCH_INPUT_VOLUME, RCH_INPUT_VOLUME, 0, 0x04, 0xf1, 0xff, 0, adc_tlv),
 	SOC_SINGLE("Digital Playback mute", MODE_CONTROL_3, 5, 1, 0),
 	SOC_SINGLE("Aux In Switch", DIGITAL_FILTER_MODE, 1, 1, 0),
+	SOC_ENUM("I2S Sdto Output Select", akm4951_enum[8]),
 	SOC_ENUM("Alc Switch", akm4951_enum[0]),
 	SOC_ENUM("Eq1 Switch", akm4951_enum[2]),
 	SOC_ENUM("Eq2 Switch", akm4951_enum[3]),
@@ -517,15 +525,20 @@ static int akm4951_suspend(struct snd_soc_codec *codec, pm_message_t state)
 	spk_mute();
 	msleep(5);
 
-        akm4951_i2c_read_reg(0x00, &data, 1);
-        power_reg0 = data;
-        data &= 0x40;
-        ret |= akm4951_i2c_write_regs(0x00, &data, 1);
-        msleep(5);
+	akm4951_i2c_read_reg(0x02, &data, 1);
+	power_reg2 = data;
+	data &= 0x7f;
+	ret |= akm4951_i2c_write_regs(0x02, &data, 1);
+	msleep(5);
         akm4951_i2c_read_reg(0x01, &data, 1);
         power_reg1 = data;
         data &= 0xcd;
         ret |= akm4951_i2c_write_regs(0x01, &data, 1);
+        msleep(5);
+        akm4951_i2c_read_reg(0x00, &data, 1);
+        power_reg0 = data;
+        data &= 0x40;
+        ret |= akm4951_i2c_write_regs(0x00, &data, 1);
 	return 0;
 }
 
@@ -538,7 +551,10 @@ static int akm4951_resume(struct snd_soc_codec *codec)
         msleep(5);
         data = power_reg1;
         ret |= akm4951_i2c_write_regs(0x01, &data, 1);
-        msleep(50);
+        msleep(5);
+	data = power_reg2;
+	ret |= akm4951_i2c_write_regs(0x02, &data, 1);
+	msleep(50);
 
 	spk_unmute();
         return 0;
@@ -558,8 +574,30 @@ static int codec_dac_setup(void)
 	/* Power on DAC ADC DSP */
 	data = 0xc7;
 	ret |= akm4951_i2c_write_regs(0x00, &data, 1);
+#ifdef LOUT_ROUT_REPLAY
+	data = 0x24;
+	ret |= akm4951_i2c_write_regs(0x04, &data, 1);
+	data = 0x8d;
+	ret |= akm4951_i2c_write_regs(0x01, &data, 1);
+	data = 0x8f;
+	ret |= akm4951_i2c_write_regs(0x01, &data, 1);
+	msleep(5);
+	data = 0x80;
+	ret |= akm4951_i2c_write_regs(0x02, &data, 1);
+#elif defined(SPP_SPN_REPLAY)
+	data = 0x8c;
+	ret |= akm4951_i2c_write_regs(0x01, &data, 1);
+	data = 0x8e;
+	ret |= akm4951_i2c_write_regs(0x01, &data, 1);
+	data = 0x20;
+	ret |= akm4951_i2c_write_regs(0x02, &data, 1);
+	msleep(5);
+	data = 0xa0;
+	ret |= akm4951_i2c_write_regs(0x02, &data, 1);
+#else
 	data = 0xbc;
 	ret |= akm4951_i2c_write_regs(0x01, &data, 1);
+#endif
 
 	if (ret)
 		printk("===>ERROR: akm4951 init error!\n");
@@ -594,8 +632,32 @@ static ssize_t akm4951_regs_show(struct device *dev,
 	return 0;
 }
 
+/* The codec register write interface is just for debug. */
+#define AKM4951_REG_SUM         0x4f
+static ssize_t akm4951_regs_write(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t n)
+{
+	int ret;
+	char * buf_2;
+	unsigned char reg_addr, reg_val;
+
+	reg_addr  = (unsigned char)simple_strtoul(buf, &buf_2, 0);
+	buf_2 = skip_spaces(buf_2);
+	reg_val = (unsigned char)simple_strtoul(buf_2, NULL, 0);
+
+	if (reg_addr > AKM4951_REG_SUM)
+		return -EINVAL;
+
+	printk("\nwrite reg: 0x%x 0x%x\n", reg_addr, reg_val);
+
+	ret = akm4951_i2c_write_regs(reg_addr, &reg_val, 1);
+	if (ret)
+		printk("write reg fail\n");
+	return n;
+}
+
 static struct device_attribute akm4951_sysfs_attrs =
-		__ATTR(akm4951_regs, S_IRUGO, akm4951_regs_show, NULL);
+		__ATTR(akm4951_regs, S_IRUGO | S_IWUSR, akm4951_regs_show, akm4951_regs_write);
 
 static int akm4951_probe(struct snd_soc_codec *codec)
 {
@@ -631,6 +693,18 @@ static int akm4951_remove(struct snd_soc_codec *codec)
 	msleep(5);
 
 	/* Power down akm4951 */
+	akm4951_i2c_read_reg(0x02, &data, 1);
+	data &= 0x7f;
+	ret |= akm4951_i2c_write_regs(0x02, &data, 1);
+
+	akm4951_i2c_read_reg(0x01, &data, 1);
+	data &= 0xcd;
+	ret |= akm4951_i2c_write_regs(0x01, &data, 1);
+
+	akm4951_i2c_read_reg(0x00, &data, 1);
+	data &= 0x40;
+	ret |= akm4951_i2c_write_regs(0x00, &data, 1);
+
 	akm4951_i2c_read_reg(0x01, &data, 1);
 	data &= 0xfb;
 	ret |= akm4951_i2c_write_regs(0x01, &data, 1);

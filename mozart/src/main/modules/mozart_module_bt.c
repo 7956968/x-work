@@ -8,6 +8,7 @@
 #include <linux/soundcard.h>
 #include <string.h>
 #include <inttypes.h>
+#include <sys/mman.h>
 
 #include "utils_interface.h"
 #include "sharememory_interface.h"
@@ -267,7 +268,6 @@ static void dialog_streamSetOnOff(BOOLEAN enable)
 		/* play audio pcm use dsp */
 		if (dialog_doLiveAudio)
 		{
-			printf("dialog_doLiveAudio");
 			if (dia_dsp_fd == -1) {
 				char buf[16] = {};
 				int volume = 0;
@@ -504,12 +504,10 @@ static void audio_decoder_process(UINT8 *inpBytes, UINT16 data_len, short *outSa
 	}
 }
 
-
 static void audio_addSampleData(short *samples)
 {
 	int ret = 0;
 	int samples_length = dia_blockLen * sizeof(short);
-	
 
 	if (dialog_doLiveAudio)
 	{
@@ -529,7 +527,8 @@ static void audio_addSampleData(short *samples)
 	if (dia_doSpeechRecognition)
 	{
 		//speechRecGoogle.addSampleData(samples);
-	}}
+	}
+}
 
 static void dialog_sendAudioData(UINT8 *data, UINT16 data_len)
 {
@@ -550,40 +549,10 @@ static int dialog_init()
 }
 #endif /* SUPPORT_BSA_BLE_HH_DIALOG_AUDIO */
 
-#if (SUPPORT_WEBRTC == 1)
-bt_aec_callback bt_ac;
-#endif
-
 #if (SUPPORT_BT == BT_BCM)
 extern int bsa_start_regular_enable;
 extern int bt_link_state;
 #endif
-
-#if ((SUPPORT_BSA_HS_RESAMPLE == 1) || (SUPPORT_AEC_RESAMPLE == 1))
-af_resample_t* hs_resample_s;
-hs_sample_init_data hs_sample_data = {0};
-hs_resample_init_data hs_resample_data = {
-	.resample_rate = 0,
-	.resample_bits = 0,
-	.resample_channel = 0,
-	.resample_enable = 0,
-	.mozart_hs_resample_data_cback = NULL,
-};
-#endif
-
-#if (SUPPORT_AEC_RESAMPLE == 1)
-af_resample_t* aec_resample_s;
-
-bt_aec_sample_init_data bt_aec_sdata = {0};
-bt_aec_resample_init_data bt_aec_rdata = {
-	.resample_rate = 0,
-	.resample_bits = 0,
-	.resample_channel = 0,
-	.resample_enable = 0,
-	.resample_time = 0,
-	.aec_resample_data_cback = NULL,
-};
-#endif /* SUPPORT_AEC_RESAMPLE */
 
 extern int bluetooth_cancel_auto_reconnect_pthread();
 
@@ -592,8 +561,9 @@ static int mozart_bluetooth_dg_uipc_cback(UINT16 event, UINT8 *buf, UINT32 lengt
 {
 	int i = 0;
 	if (event == UIPC_RX_DATA_READY_EVT) {
+		printf("length = %d\n", length);
 		for (i = 0; i < length; i++) {
-			printf("%02x ", buf[i]);
+			printf("0x%02x ", buf[i]);
 		}
 		printf("\n");
 	}
@@ -602,157 +572,375 @@ static int mozart_bluetooth_dg_uipc_cback(UINT16 event, UINT8 *buf, UINT32 lengt
 }
 #endif /* SUPPORT_BSA_SPPS */
 
-#if (SUPPORT_BSA_BLE == 1)
-extern int bsa_ble_start_regular_enable;
-extern int ble_service_create_enable;
-extern int ble_service_add_char_enable;
-extern int ble_service_start_enable;
-extern int ble_client_open_enable;
-int ble_client_read_enable;
-extern int ble_client_write_enable;
-extern int ble_hh_add_dev_enable;
-ble_create_service_data ble_heart_rate_service;
-ble_add_char_data ble_heart_rate_measure_char;
-ble_add_char_data ble_notify_char;
+#if (SUPPORT_BSA_SPPC == 1)
+enum {
+	DG_IDLE,
+	DG_CONNECTED,
+	DG_CONNECT_FAILED,
+	DG_DISCONNECTED,
+};
+extern int bt_dg_flag;
+BOOLEAN sdpu_is_base_uuid(char *uuid)
+{
+	UINT16 i;
+	static const char sdp_base_uuid[] = {0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0x80, 0x5F, 0x9B, 0x34, 0xFB};
 
-#if (SUPPORT_BSA_BLE_SERVER == 1)
-static int bt_ble_server_write_cback(tBSA_BLE_SE_WRITE_MSG *ble_ser_write, UINT16 char_uuid)
+	for (i = 4; i < MAX_UUID_SIZE; i++) {
+		if (uuid[i] != sdp_base_uuid[i]) {
+			return (false);
+		}
+	}
+	/* If here, matched */
+	return (true);
+}
+#endif
+
+#if (SUPPORT_BSA_BLE == 1)
+tAPP_BLE_CB *bsa_ble_cb = NULL;
+extern int bsa_ble_start_regular_enable;
+int ble_service_create_enable = 0;
+int ble_service_add_char_enable = 0;
+int ble_service_start_enable = 0;
+int ble_client_open_enable = 0;
+int ble_client_read_enable;
+int ble_client_write_enable = 0;
+extern int ble_hh_add_dev_enable;
+struct {
+	ble_create_service_data service;
+	ble_char_data 	measure_character;
+	ble_char_notify measure_notif;
+} ble_heart_rate;
+
+pthread_mutex_t ble_conn_lock;
+void mozart_ble_print_conn_id(int *conn_id)
 {
 	int i = 0;
-	for (i = 0; i < ble_ser_write->len; i++) {
-		printf("value[%d] = 0x%x\n", i, ble_ser_write->value[i]);
+
+	for (i = 0; i < NOTIFY_CONN_MAX_NUM; i++) {
+		if (conn_id[i] != 0)
+			printf("conn_id[%d] = %d\n", i, conn_id[i]);
+	}
+}
+
+int mozart_ble_add_conn_id(int add_id, int *conn_id)
+{
+	pthread_mutex_lock(&ble_conn_lock);
+	int i = 0;
+
+	for (i = 0; i < NOTIFY_CONN_MAX_NUM; i++) {
+		if (conn_id[i] == 0) {
+			conn_id[i] = add_id;
+			break;
+		}
+	}
+	if (i >= NOTIFY_CONN_MAX_NUM) {
+		printf("conn_id num: %d > NOTIFY_CONN_MAX_NUM: %d\n", i, NOTIFY_CONN_MAX_NUM);
+		pthread_mutex_unlock(&ble_conn_lock);
+		return -1;
+	}
+	pthread_mutex_unlock(&ble_conn_lock);
+
+	return 0;
+}
+
+int mozart_ble_del_conn_id(int del_id, int *conn_id)
+{
+	pthread_mutex_lock(&ble_conn_lock);
+	int i = 0, j = 0;
+
+	for (i = 0; i < NOTIFY_CONN_MAX_NUM; i++) {
+		if (conn_id[i] == del_id) {
+			if (i < (NOTIFY_CONN_MAX_NUM - 1)) {
+				for (j = i; j < (NOTIFY_CONN_MAX_NUM - 1); j++) {
+					if (conn_id[j + 1] != 0)
+						conn_id[j] = conn_id[j + 1];
+					else {
+						conn_id[j] = 0;
+						break;
+					}
+				}
+			} else if (i == (NOTIFY_CONN_MAX_NUM - 1)) {
+				conn_id[i] = 0;
+						break;
+			}
+			break;
+		}
+	}
+	pthread_mutex_unlock(&ble_conn_lock);
+
+	return 0;
+}
+
+int mozart_ble_send_indication()
+{
+	int i = 0;
+	int server_num = 0;
+	int char_attr_num = 0, value_len = 0;
+	ble_server_indication ble_indication;
+
+	server_num =  ble_heart_rate.service.server_num;
+	char_attr_num = ble_heart_rate.measure_character.char_attr_num;
+	value_len = bsa_ble_cb->ble_server[server_num].attr[char_attr_num].value_len;
+	ble_indication.server_num = server_num;
+	ble_indication.attr_num   = char_attr_num;
+	ble_indication.length_of_data = value_len;
+
+	for (i = 0; i < NOTIFY_CONN_MAX_NUM; i++) {
+		if (ble_heart_rate.measure_notif.conn_id[i] != 0) {
+			ble_indication.conn_id = ble_heart_rate.measure_notif.conn_id[i];
+			/* send client indication */
+			mozart_bluetooth_ble_server_send_indication(&ble_indication);
+		} else
+			break;
+	}
+
+	return 0;
+}
+
+#define PREFIX_LEN	4
+#define PRO_LEN 	16
+#define MAJOR_LEN	2
+#define MINOR_LEN	2
+#define TXPOWER_LEN	1
+#define UUID_LEN	25  /* UUID_LEN = PREFIX_LEN + PRO_LEN + MAJOR_LEN + MINOR_LEN + TXPOWER_LEN */
+int mozart_bluetooth_ble_parse_ibeacon_data(UINT8 * eir_data)
+{
+	int index = 0;
+	bsa_manu_data manu_data = {0};;
+
+	mozart_bluetooth_parse_eir_manuf_specific(eir_data, &manu_data);
+	if (manu_data.data_length > 0) {
+		printf("Manufacturer data length = %d\n", manu_data.data_length);
+		printf("Manufacturer Specific CompanyId: 0x%04X\n", manu_data.company_id);
+		if (manu_data.company_id == 0x004c) {
+			printf("Apple Ibeacon!\n");
+		}
+		printf("Manufacturer data: \n");
+		for (index = 0; index < manu_data.data_length; index++)
+		{
+			printf("0x%02X ", manu_data.p_manu[index]);
+		}
+		printf("\n");
+		printf("Proximity UUID: ");
+		for (index = 0; index < PRO_LEN; index++)
+		{
+			printf("0x%02X ", manu_data.p_manu[index+2]);
+		}
+		printf("\n");
+		printf("Major: ");
+		for (index = 0; index < MAJOR_LEN; index++)
+		{
+			printf("0x%02X ", manu_data.p_manu[manu_data.data_length - 5 + index]);
+		}
+		printf("\n");
+		printf("Minor: ");
+		for (index = 0; index < MINOR_LEN; index++)
+		{
+			printf("0x%02X ", manu_data.p_manu[manu_data.data_length - 3 + index]);
+		}
+		printf("\n");
+		printf("Txpower: ");
+		printf("0x%02X \n", manu_data.p_manu[manu_data.data_length-1]);
 	}
 	return 0;
 }
 
-static int ble_service_and_char_create()
+#if (SUPPORT_BSA_BLE_SERVER == 1)
+static int bsa_ble_server_profile_cback(tBSA_BLE_EVT event, tBSA_BLE_MSG *p_data)
 {
+	int attr_index, index;
 	int i = 0;
+
+	switch (event) {
+		case BSA_BLE_SE_CREATE_EVT:
+			printf("## BSA_BLE_SE_CREATE_EVT!\n");
+			printf("server_if:%d status:%d service_id:%d\n",
+					p_data->ser_create.server_if,
+					p_data->ser_create.status,
+					p_data->ser_create.service_id);
+			ble_service_create_enable = 1;
+			break;
+		case BSA_BLE_SE_ADDCHAR_EVT:
+			printf("## BSA_BLE_SE_ADDCHAR_EVT!\n");
+			printf("status: %d\n", p_data->ser_addchar.status);
+			printf("attr_id: 0x%x\n", p_data->ser_addchar.attr_id);
+			ble_service_add_char_enable = 1;
+			break;
+		case BSA_BLE_SE_START_EVT:
+			printf("## BSA_BLE_SE_START_EVT!\n");
+			printf("status: %d\n", p_data->ser_start.status);
+			ble_service_start_enable = 1;
+			break;
+		case BSA_BLE_SE_READ_EVT:
+			printf("## BSA_BLE_SE_READ_EVT!\n");
+			printf("status: %d\n", p_data->ser_read.status);
+			printf("conn_id: %d\n", p_data->ser_read.conn_id);
+			break;
+		case BSA_BLE_SE_WRITE_EVT:
+			printf("## BSA_BLE_SE_WRITE_EVT!\n");
+			printf("status: %d\n", p_data->ser_write.status);
+			printf("conn_id: %d, handle: %d\n", p_data->ser_write.conn_id, p_data->ser_write.handle);
+			{
+				for (index = 0; index < BSA_BLE_SERVER_MAX; index++)
+				{
+					if (bsa_ble_cb->ble_server[index].enabled)
+					{
+						for (attr_index = 0; attr_index < BSA_BLE_ATTRIBUTE_MAX; attr_index++)
+						{
+							if (bsa_ble_cb->ble_server[index].attr[attr_index].attr_UUID.uu.uuid16)
+							{
+								if (bsa_ble_cb->ble_server[index].attr[attr_index].attr_id == p_data->ser_write.handle) {
+									printf("ble_server[%d].attr[%d].attr_id = %d\n",
+											index, attr_index,
+											bsa_ble_cb->ble_server[index].attr[attr_index].attr_id);
+									printf("ble_server[%d].attr[%d].attr_UUID.uu.uuid16 = 0x%02x\n",
+											index, attr_index,
+											bsa_ble_cb->ble_server[index].attr[attr_index].attr_UUID.uu.uuid16);
+									memset(bsa_ble_cb->ble_server[index].attr[attr_index].value, 0, BSA_BLE_MAX_ATTR_LEN);
+									memcpy(bsa_ble_cb->ble_server[index].attr[attr_index].value, p_data->ser_write.value, p_data->ser_write.len);
+									bsa_ble_cb->ble_server[index].attr[attr_index].value_len = p_data->ser_write.len;
+									for (i = 0; i < p_data->ser_write.len; i++) {
+										printf("value[%d] = 0x%x\n", i, p_data->ser_write.value[i]);
+									}
+									goto BLE_SE_WRITE_SendRSP;
+								}
+							}
+						}
+					}
+				}
+BLE_SE_WRITE_SendRSP:
+				if (index >= BSA_BLE_SERVER_MAX) {
+					printf("Error: not find Ble Server, please check!\n");
+					break;
+				}
+				/* Judged which Characterisic Notify is be Writed */
+				if ((index == ble_heart_rate.service.server_num) &&
+						(attr_index == ble_heart_rate.measure_notif.char_data.char_attr_num)) {
+					UINT8 *value = NULL;
+					ble_server_indication ble_indication;
+					int char_attr_num = 0, value_len = 0;
+
+					char_attr_num = ble_heart_rate.measure_notif.char_data.char_attr_num;
+					value = bsa_ble_cb->ble_server[index].attr[char_attr_num].value;
+					/* Nofification opened */
+					if (value[0] == 1) {
+						mozart_ble_add_conn_id(p_data->ser_write.conn_id, ble_heart_rate.measure_notif.conn_id);
+						char_attr_num = ble_heart_rate.measure_character.char_attr_num;
+						value_len = bsa_ble_cb->ble_server[index].attr[char_attr_num].value_len;
+						ble_indication.server_num = index;
+						ble_indication.attr_num   = char_attr_num;
+						ble_indication.length_of_data = value_len;
+						ble_indication.conn_id = p_data->ser_write.conn_id;
+						/* send client indication */
+						mozart_bluetooth_ble_server_send_indication(&ble_indication);
+					} else if (value[0] == 0) {
+						mozart_ble_del_conn_id(p_data->ser_write.conn_id, ble_heart_rate.measure_notif.conn_id);
+					}
+				}
+			}
+			break;
+		case BSA_BLE_SE_OPEN_EVT:
+			printf("## BSA_BLE_SE_OPEN_EVT!\n");
+			printf("open status: %d, conn_id: %d, bd_addr: %02x:%02x:%02x:%02x:%02x:%02x\n",
+					p_data->ser_open.reason, p_data->ser_open.conn_id,
+					p_data->ser_open.remote_bda[0],
+					p_data->ser_open.remote_bda[1],
+					p_data->ser_open.remote_bda[2],
+					p_data->ser_open.remote_bda[3],
+					p_data->ser_open.remote_bda[4],
+					p_data->ser_open.remote_bda[5]);
+			break;
+		case BSA_BLE_SE_CLOSE_EVT:
+			printf("## BSA_BLE_SE_CLOSE_EVT!\n");
+			printf("status: %d\n", p_data->ser_close.reason);
+			printf("conn_id: 0x%x\n", p_data->ser_close.conn_id);
+			mozart_ble_del_conn_id(p_data->ser_close.conn_id, ble_heart_rate.measure_notif.conn_id);
+			break;
+		default:
+			printf("%s not handle this event: %d\n", __func__, event);
+			break;
+	}
+
+	return 0;
+}
+
+static int ble_server_set_ibeacon_data(UINT8 *p_val, UINT8 *proximity_uuid, UINT8 *major, UINT8 *minor, UINT8 *txpower)
+{
+	int len = 0, i = 0;
+	UINT8 prefix_data[PREFIX_LEN] = {0x4C, 0x00, 0x02, 0x15};
+
+	memcpy(p_val, prefix_data, PREFIX_LEN);
+	len = PREFIX_LEN;
+	memcpy(p_val + len, proximity_uuid, PRO_LEN);
+	len += PRO_LEN;
+	memcpy(p_val + len, major, MAJOR_LEN);
+	len += MAJOR_LEN;
+	memcpy(p_val + len, minor, MINOR_LEN);
+	len += MINOR_LEN;
+	memcpy(p_val + len, txpower, TXPOWER_LEN);
+	len += TXPOWER_LEN;
+
+	for (i = 0; i < UUID_LEN; i++) {
+		printf("%02x ", p_val[i]);
+		if(i == (UUID_LEN / 2))
+			printf("\n");
+	}
+	printf("\n");
+
+	return 0;
+}
+
+int ble_server_create_ibeacon_adv()
+{
 	int state = 0;
-	int server_num = 0;
-	tBSA_DM_BLE_ADV_CONFIG ble_config_adv;
-	tBSA_DM_BLE_ADV_PARAM ble_adv_param;
-	ble_start_service_data ble_start_service;
-	/* First 2 byte is Company Identifier Eg: 0x000f refers to Broadcom Corporation, followed by 6 bytes of data*/
-	UINT8 app_ble_adv_value[APP_BLE_ADV_VALUE_LEN] = {0x0F, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
+	tBSA_DM_BLE_ADV_CONFIG ble_config_adv = {0};
 
-	memset(&ble_heart_rate_service, 0, sizeof(ble_create_service_data));
-	memset(&ble_heart_rate_measure_char, 0, sizeof(ble_add_char_data));
-	memset(&ble_config_adv, 0, sizeof(tBSA_DM_BLE_ADV_CONFIG));
-	memset(&ble_start_service, 0, sizeof(ble_start_service_data));
+	/* 02 01 1a 1a ff 4c 00 02 15  # Apple's fixed iBeacon advertising prefix */
+	ble_config_adv.flag = BTM_BLE_BREDR_NOT_SPT | BTM_BLE_GEN_DISC_FLAG;
+	/* iBeacon profile uuid (128 bits) */
+	UINT8 proximity_uuid[PRO_LEN] = {0xB9, 0x40, 0x7F, 0x30, 0xF5, 0xF8, 0x46, 0x6E,
+		0xAF, 0xF9, 0x25, 0x55, 0x6B, 0x57, 0xFE, 0x6D};
+	UINT8 major[MAJOR_LEN] = {0x00, 0x49};
+	UINT8 minor[MINOR_LEN] = {0x00, 0x0A};
+	UINT8 txpower[TXPOWER_LEN] = {0xC5};
 
-	server_num = mozart_bluetooth_ble_server_register(APP_BLE_MAIN_DEFAULT_APPL_UUID);
-	if (server_num < 0) {
-		printf("mozart_bluetooth_ble_server_register failed, state = %d.\n", state);
-		return -1;
-	}
-	ble_heart_rate_service.server_num = server_num;
-	ble_heart_rate_service.service_uuid = BSA_BLE_UUID_SERVCLASS_HEART_RATE;
-	ble_heart_rate_service.num_handle = 10;
-	ble_heart_rate_service.is_primary = 1;
-	state = mozart_bluetooth_ble_server_create_service(&ble_heart_rate_service);
-	if (state) {
-		printf("mozart_bluetooth_ble_create_service failed, state = %d.\n", state);
-		return -1;
-	}
-	for (i = 0; i < 30; i++) {
-		if(ble_service_create_enable != 1)
-			usleep(300*1000);
-		else
-			break;
-	}
-	if (ble_service_create_enable == 1)
-		ble_service_create_enable = 0;
-	else {
-		printf("Error: not recived BSA_BLE_SE_CREATE_EVT, please checked!\n");
-		return -1;
-	}
-
-	ble_heart_rate_measure_char.server_num = server_num;
-	ble_heart_rate_measure_char.srvc_attr_num = ble_heart_rate_service.attr_num;
-	ble_heart_rate_measure_char.char_uuid = BSA_BLE_GATT_UUID_HEART_RATE_MEASUREMENT;
-	ble_heart_rate_measure_char.is_descript = 0;
-	/* Attribute Permissions[Eg: Read-0x1, Write-0x10, Read | Write-0x11] */
-	ble_heart_rate_measure_char.attribute_permission = BSA_GATT_PERM_READ | BSA_GATT_PERM_WRITE;
-	/* Characterisic Properties Eg: WRITE-0x08, READ-0x02, Notify-0x10, Indicate-0x20
-	 * Eg: For READ | WRITE|NOTIFY | INDICATE enter 0x3A */
-	ble_heart_rate_measure_char.characteristic_property = BSA_GATT_CHAR_PROP_BIT_READ | BSA_GATT_CHAR_PROP_BIT_WRITE |
-								BSA_GATT_CHAR_PROP_BIT_NOTIFY | BSA_GATT_CHAR_PROP_BIT_INDICATE;
-	state = mozart_bluetooth_ble_server_add_character(&ble_heart_rate_measure_char);
-	if (state) {
-		printf("mozart_bluetooth_ble_server_add_character failed, state = %d.\n", state);
-		return -1;
-	}
-	for (i = 0; i < 30; i++) {
-		if(ble_service_add_char_enable != 1)
-			usleep(300*1000);
-		else
-			break;
-	}
-	if (ble_service_add_char_enable == 1) {
-		ble_service_add_char_enable = 0;
-	} else {
-		printf("Error: not recived BSA_BLE_SE_ADDCHAR_EVT, please checked!\n");
-		return -1;
-	}
-	/* descripter: service notify */
-	ble_notify_char.server_num = server_num;
-	ble_notify_char.srvc_attr_num = ble_heart_rate_service.attr_num;
-	ble_notify_char.char_uuid = GATT_UUID_CHAR_CLIENT_CONFIG;
-	ble_notify_char.is_descript = 1;
-	ble_notify_char.attribute_permission = BSA_GATT_PERM_READ | BSA_GATT_PERM_WRITE;
-	ble_notify_char.characteristic_property = 0;
-	state = mozart_bluetooth_ble_server_add_character(&ble_notify_char);
-	if (state) {
-		printf("mozart_bluetooth_ble_server_add_character failed, state = %d.\n", state);
-		return -1;
-	}
-	for (i = 0; i < 30; i++) {
-		if(ble_service_add_char_enable != 1)
-			usleep(300*1000);
-		else
-			break;
-	}
-	if (ble_service_add_char_enable == 1) {
-		ble_service_add_char_enable = 0;
-	} else {
-		printf("Error: not recived BSA_BLE_SE_ADDCHAR_EVT, please checked!\n");
-		return -1;
-	}
-
-	ble_start_service.server_num = server_num;
-	ble_start_service.attr_num = ble_heart_rate_service.attr_num;
-	state = mozart_bluetooth_ble_server_start_service(&ble_start_service);
-	if (state) {
-		printf("mozart_bluetooth_ble_server_tart_service failed, state = %d.\n", state);
-		return -1;
-	}
-	for (i = 0; i < 30; i++) {
-		if(ble_service_start_enable != 1)
-			usleep(300*1000);
-		else
-			break;
-	}
-	if (ble_service_start_enable == 1) {
-		ble_service_start_enable = 0;
-	} else {
-		printf("Error: not recived BSA_BLE_SE_START_EVT, please checked!\n");
-		return -1;
-	}
-
-	/* Active broadcast */
-	/* This is just sample code to show how BLE Adv data can be sent from application */
-	/* Adv.Data should be < 31bytes, including Manufacturer data, Device Name, Appearance data, Services Info, etc.. */
-	ble_config_adv.appearance_data = BLE_ADV_APPEARANCE_DATA;
-	ble_config_adv.num_service = 1;
-	ble_config_adv.uuid_val[0] = BSA_BLE_UUID_SERVCLASS_HEART_RATE;
-	ble_config_adv.len = APP_BLE_ADV_VALUE_LEN;
-	ble_config_adv.flag = BSA_DM_BLE_ADV_FLAG_MASK;
+	ble_config_adv.len = UUID_LEN;
 	ble_config_adv.is_scan_rsp = 0; 	/* 0 is Active broadcast, 1 is Passive broadcast */
 	ble_config_adv.is_part_service = 1; 	/* 1 is 0x02, 0 is 0x03 */
+	ble_config_adv.adv_data_mask = BSA_DM_BLE_AD_BIT_FLAGS | BSA_DM_BLE_AD_BIT_MANU;
+	ble_server_set_ibeacon_data(ble_config_adv.p_val, proximity_uuid, major, minor, txpower);
+	state = mozart_bluetooth_ble_configure_adv_data(&ble_config_adv);
+	if (state) {
+		printf("mozart_bluetooth_ble_configure_adv_data failed, state = %d.\n", state);
+		return -1;
+	}
+	return 0;
+}
+
+
+static int ble_service_config_adv_data()
+{
+	int state = 0;
+	tBSA_DM_BLE_ADV_CONFIG ble_config_adv;
+	tBSA_DM_BLE_ADV_PARAM ble_adv_param;
+	/* First 2 byte is Company Identifier Eg: 0x000f refers to Broadcom Corporation, followed by 6 bytes of data*/
+	UINT8 app_ble_adv_value[APP_BLE_ADV_VALUE_LEN] = { 0x0F, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
+
+	/* Active broadcast */
+	/* Adv.Data should be < 31bytes,
+	 * including Manufacturer data, Device Name,
+	 * Appearance data, Services Info, etc.. */
+	ble_config_adv.appearance_data	= BLE_ADV_APPEARANCE_DATA;
+	ble_config_adv.num_service 	= 1;
+	ble_config_adv.uuid_val[0]	= BSA_BLE_UUID_SERVCLASS_HEART_RATE;
+	ble_config_adv.len		= APP_BLE_ADV_VALUE_LEN;
+	ble_config_adv.flag		= BSA_DM_BLE_ADV_FLAG_MASK;
+	ble_config_adv.is_scan_rsp 	= 0; 	/* 0 is Active broadcast, 1 is Passive broadcast */
+	ble_config_adv.is_part_service 	= 1; 	/* 1 is 0x02, 0 is 0x03 */
 	memcpy(ble_config_adv.p_val, app_ble_adv_value, APP_BLE_ADV_VALUE_LEN);
 	/* All the masks/fields that are set will be advertised */
-	ble_config_adv.adv_data_mask = BSA_DM_BLE_AD_BIT_FLAGS|BSA_DM_BLE_AD_BIT_SERVICE|BSA_DM_BLE_AD_BIT_DEV_NAME;
+	ble_config_adv.adv_data_mask = BSA_DM_BLE_AD_BIT_FLAGS | BSA_DM_BLE_AD_BIT_MANU | BSA_DM_BLE_AD_BIT_DEV_NAME;
 	state = mozart_bluetooth_ble_configure_adv_data(&ble_config_adv);
 	if (state) {
 		printf("mozart_bluetooth_ble_configure_adv_data failed, state = %d.\n", state);
@@ -763,8 +951,7 @@ static int ble_service_and_char_create()
 	memset(&ble_config_adv, 0, sizeof(tBSA_DM_BLE_ADV_CONFIG));
 	/* start advertising */
 	ble_config_adv.adv_data_mask = BSA_DM_BLE_AD_BIT_DEV_NAME;
-	ble_config_adv.is_scan_rsp = 1;
-
+	ble_config_adv.is_scan_rsp   = 1;
 	state = mozart_bluetooth_ble_configure_adv_data(&ble_config_adv);
 	if (state) {
 		printf("mozart_bluetooth_ble_configure_adv_data failed, state = %d.\n", state);
@@ -782,25 +969,158 @@ static int ble_service_and_char_create()
 
 	return 0;
 }
+
+static int ble_service_and_char_create()
+{
+	int state = 0;
+	int try = 0, try_max = 30;
+	ble_start_service_data ble_start_service;
+
+	ble_heart_rate.service.service_uuid = BSA_BLE_UUID_SERVCLASS_HEART_RATE;
+	ble_heart_rate.service.num_handle   = 10;
+	ble_heart_rate.service.is_primary   = 1;
+	ble_heart_rate.service.server_num   = mozart_bluetooth_ble_server_register(APP_BLE_MAIN_DEFAULT_APPL_UUID);
+	if (ble_heart_rate.service.server_num < 0) {
+		printf("mozart_bluetooth_ble_server_register failed, state = %d.\n", state);
+		return -1;
+	}
+
+	state = mozart_bluetooth_ble_server_create_service(&ble_heart_rate.service);
+	if (state) {
+		printf("mozart_bluetooth_ble_create_service failed, state = %d.\n", state);
+		return -1;
+	}
+	for (try = 0; try < try_max; try++) {
+		if(ble_service_create_enable != 1)
+			usleep(300*1000);
+		else
+			break;
+	}
+	if (ble_service_create_enable == 1)
+		ble_service_create_enable = 0;
+	else {
+		printf("Error: not recived BSA_BLE_SE_CREATE_EVT, please checked!\n");
+		return -1;
+	}
+	ble_heart_rate.measure_character.server_num    = ble_heart_rate.service.server_num;
+	ble_heart_rate.measure_character.srvc_attr_num = ble_heart_rate.service.attr_num;
+	ble_heart_rate.measure_character.char_uuid     = BSA_BLE_GATT_UUID_HEART_RATE_MEASUREMENT;
+	ble_heart_rate.measure_character.attribute_permission    = BSA_GATT_PERM_READ | BSA_GATT_PERM_WRITE;
+	ble_heart_rate.measure_character.characteristic_property = BSA_GATT_CHAR_PROP_BIT_READ | BSA_GATT_CHAR_PROP_BIT_WRITE |
+									BSA_GATT_CHAR_PROP_BIT_NOTIFY | BSA_GATT_CHAR_PROP_BIT_INDICATE;
+	state = mozart_bluetooth_ble_server_add_character(&ble_heart_rate.measure_character);
+	if (state) {
+		printf("mozart_bluetooth_ble_server_add_character failed, state = %d.\n", state);
+		return -1;
+	}
+	for (try = 0; try < try_max; try++) {
+		if(ble_service_add_char_enable != 1)
+			usleep(300*1000);
+		else
+			break;
+	}
+	if (ble_service_add_char_enable == 1) {
+		ble_service_add_char_enable = 0;
+	} else {
+		printf("Error: not recived BSA_BLE_SE_ADDCHAR_EVT, please checked!\n");
+		return -1;
+	}
+	/* descripter: service notify */
+	ble_heart_rate.measure_notif.char_data.server_num    = ble_heart_rate.service.server_num;
+	ble_heart_rate.measure_notif.char_data.srvc_attr_num = ble_heart_rate.service.attr_num;
+	ble_heart_rate.measure_notif.char_data.char_uuid = GATT_UUID_CHAR_CLIENT_CONFIG;
+	ble_heart_rate.measure_notif.char_data.is_descript = true;
+	ble_heart_rate.measure_notif.char_data.characteristic_property = 0;
+	ble_heart_rate.measure_notif.char_data.attribute_permission = BSA_GATT_PERM_READ | BSA_GATT_PERM_WRITE;
+	state = mozart_bluetooth_ble_server_add_character(&ble_heart_rate.measure_notif.char_data);
+	if (state) {
+		printf("mozart_bluetooth_ble_server_add_character failed, state = %d.\n", state);
+		return -1;
+	}
+	for (try = 0; try < try_max; try++) {
+		if(ble_service_add_char_enable != 1)
+			usleep(300*1000);
+		else
+			break;
+	}
+	if (ble_service_add_char_enable == 1) {
+		ble_service_add_char_enable = 0;
+	} else {
+		printf("Error: not recived BSA_BLE_SE_ADDCHAR_EVT, please checked!\n");
+		return -1;
+	}
+
+	ble_start_service.server_num = ble_heart_rate.service.server_num;
+	ble_start_service.attr_num   = ble_heart_rate.service.attr_num;
+	state = mozart_bluetooth_ble_server_start_service(&ble_start_service);
+	if (state) {
+		printf("mozart_bluetooth_ble_server_tart_service failed, state = %d.\n", state);
+		return -1;
+	}
+	for (try = 0; try < try_max; try++) {
+		if(ble_service_start_enable != 1)
+			usleep(300*1000);
+		else
+			break;
+	}
+	if (ble_service_start_enable == 1) {
+		ble_service_start_enable = 0;
+	} else {
+		printf("Error: not recived BSA_BLE_SE_START_EVT, please checked!\n");
+		return -1;
+	}
+	ble_service_config_adv_data();
+	return 0;
+}
 #endif /* SUPPORT_BSA_BLE_SERVER */
 
 #if (SUPPORT_BSA_BLE_CLIENT == 1)
-static int ble_common_profile_cback(tBSA_BLE_EVT event, tBSA_BLE_MSG *p_data)
+static int bsa_ble_client_profile_cback(tBSA_BLE_EVT event, tBSA_BLE_MSG *p_data)
 {
 	int i = 0;
+
 	switch (event) {
+		case BSA_BLE_CL_DEREGISTER_EVT:
+			printf("## BSA_BLE_CL_DEREGISTER_EVT!\n");
+			printf("cif = %d status = %d\n", p_data->cli_deregister.client_if,
+					p_data->cli_deregister.status );
+			break;
+		case BSA_BLE_CL_OPEN_EVT:
+			printf("## BSA_BLE_CL_OPEN_EVT!\n");
+			printf("client_if = %d status = %d\n",
+					p_data->cli_open.client_if, p_data->cli_open.status );
+			ble_client_open_enable = 1;
+			break;
+		case BSA_BLE_CL_CLOSE_EVT:
+			printf("## BSA_BLE_CL_CLOSE_EVT!\n");
+			printf("BDA: %02X:%02X:%02X:%02X:%02X:%02X\n",
+					p_data->cli_close.remote_bda[0], p_data->cli_close.remote_bda[1],
+					p_data->cli_close.remote_bda[2], p_data->cli_close.remote_bda[3],
+					p_data->cli_close.remote_bda[4], p_data->cli_close.remote_bda[5]);
+			break;
 		case BSA_BLE_CL_READ_EVT:
+			printf("## BSA_BLE_CL_READ_EVT!\n");
+			printf("conn_id:%d len:%d\n",
+					p_data->cli_read.conn_id, p_data->cli_read.len);
+			printf("Read:\n");
 			for (i = 0; i < p_data->cli_read.len; i++) {
-				printf("Read: value[%d] = 0x%x\n", i, p_data->cli_read.value[i]);
+				printf("value[%d] = 0x%x\n", i, p_data->cli_read.value[i]);
 			}
 			ble_client_read_enable = 1;
 			break;
+		case BSA_BLE_CL_WRITE_EVT:
+			printf("## BSA_BLE_CL_WRITE_EVT!\n");
+			printf("status: %d\n", p_data->cli_write.status);
+			ble_client_write_enable = 1;
+			break;
 		case BSA_BLE_CL_NOTIF_EVT:
+			printf("## BSA_BLE_CL_NOTIF_EVT!\n");
 			for (i = 0; i < p_data->cli_notif.len; i++) {
 				printf("Notif: value[%d] = 0x%x\n", i, p_data->cli_notif.value[i]);
 			}
 			break;
 		default:
+			printf("BLE Client not handle this event:%d\n", event);
 			break;
 	}
 	return 0;
@@ -819,6 +1139,7 @@ int ble_client_create()
 	char *connect_ble_name = "BSA_BLE";
 	UINT16 client_uuid = 0x4000;
 	int num = 30;
+	int duration = 3; /* Multiple of 1.28 seconds */
 
 	/* register ble client */
 	client_num = state = mozart_bluetooth_ble_client_register(client_uuid);
@@ -828,7 +1149,7 @@ int ble_client_create()
 	}
 	for (i = 0; i < 5; i++) {
 		/* discovery ble devices */
-		state = mozart_bluetooth_ble_start_regular();
+		state = mozart_bluetooth_ble_start_regular(duration);
 		if (state != 0) {
 			printf("ERROR: mozart_bluetooth_ble_start_regular failed !\n");
 			return -1;
@@ -1011,6 +1332,7 @@ static int ble_hh_create()
 	char *connect_ble_name = "RemoteB008";
 	int num = 120;
 	int state = 0;
+	int duration = 3; /* Multiple of 1.28 seconds */
 
 	UINT16 client_uuid = 0x4000;
 	/* register ble client */
@@ -1023,7 +1345,7 @@ static int ble_hh_create()
 
 	for (i = 0; i < 5; i++) {
 		/* discovery ble devices */
-		state = mozart_bluetooth_ble_start_regular();
+		state = mozart_bluetooth_ble_start_regular(duration);
 		if (state != 0) {
 			printf("ERROR: mozart_bluetooth_ble_start_regular failed !\n");
 			return -1;
@@ -1112,64 +1434,9 @@ static void bt_info_init(bt_init_info *bt_info, char *bt_name)
 	bt_info->connectable = 0;
 	memset(bt_info->out_bd_addr, 0, sizeof(bt_info->out_bd_addr));
 }
-#if ((SUPPORT_AEC_RESAMPLE == 1) && (SUPPORT_AEC_RESAMPLE_48K_TO_8K == 1))
-int bt_aec_resample_outlen_max = 0;
-void mozart_bt_aec_resample_data_callback(bt_aec_resample_msg *bt_aec_rmsg)
-{
-	int resample_outlen = mozart_resample_get_outlen(bt_aec_rmsg->in_len, bt_aec_sdata.sample_rate, bt_aec_sdata.sample_channel, bt_aec_sdata.sample_bits, bt_aec_rdata.resample_rate);
-
-	if (bt_aec_rmsg->out_buffer == NULL) {
-		printf("bt_aec_rmsg->out_buffer == NULL !\n");
-		bt_aec_resample_outlen_max = resample_outlen;
-		bt_aec_rmsg->out_buffer = malloc(resample_outlen);
-		bt_aec_rmsg->out_len = resample_outlen;
-	} else {
-		if (resample_outlen > bt_aec_resample_outlen_max) {
-			printf("realloc !\n");
-			bt_aec_resample_outlen_max = resample_outlen;
-			bt_aec_rmsg->out_buffer = realloc(bt_aec_rmsg->out_buffer, resample_outlen);
-			bt_aec_rmsg->out_len = resample_outlen;
-		} else {
-			bt_aec_rmsg->out_len = resample_outlen;
-		}
-	}
-	bt_aec_rmsg->out_len = mozart_resample(aec_resample_s, bt_aec_sdata.sample_channel, bt_aec_sdata.sample_bits,
-					    bt_aec_rmsg->in_buffer, bt_aec_rmsg->in_len, bt_aec_rmsg->out_buffer);
-}
-#endif
-
-#if (SUPPORT_BSA_HS_RESAMPLE == 1)
-int hs_resample_outlen_max = 0;
-void mozart_hs_resample_data_callback(hs_resample_msg *hs_rmsg)
-{
-#if (SUPPORT_BSA_HS_RESAMPLE_8K_to_48K == 1)
-	int resample_outlen = mozart_resample_get_outlen(hs_rmsg->in_len, hs_sample_data.sample_rate, hs_sample_data.sample_channel, hs_sample_data.sample_bits, hs_resample_data.resample_rate);
-
-	if (hs_rmsg->out_buffer == NULL) {
-		printf("hs_rmsg->out_buffer == NULL !\n");
-		hs_resample_outlen_max = resample_outlen;
-		hs_rmsg->out_buffer = malloc(resample_outlen);
-		hs_rmsg->out_len = resample_outlen;
-	} else {
-		if (resample_outlen > hs_resample_outlen_max) {
-			printf("realloc !\n");
-			hs_resample_outlen_max = resample_outlen;
-			hs_rmsg->out_buffer = realloc(hs_rmsg->out_buffer, resample_outlen);
-			hs_rmsg->out_len = resample_outlen;
-		} else {
-			hs_rmsg->out_len = resample_outlen;
-		}
-	}
-	hs_rmsg->out_len = mozart_resample(hs_resample_s, hs_sample_data.sample_channel, hs_sample_data.sample_bits,
-					    hs_rmsg->in_buffer, hs_rmsg->in_len, hs_rmsg->out_buffer);
-#else
-	hs_rmsg->out_len = hs_rmsg->in_len;
-	hs_rmsg->out_buffer = hs_rmsg->in_buffer;
-#endif
-}
-#endif
 
 #if (SUPPORT_BSA_A2DP_SOURCE == 1)
+extern int bt_av_link_state;
 #define DEFAULT_SAMPLE_RATE	44100
 #define DEFAULT_CHANNELS	2
 #define DEFAULT_FORMAT		16
@@ -1177,7 +1444,6 @@ void mozart_hs_resample_data_callback(hs_resample_msg *hs_rmsg)
 #define BURSTSIZE		4096
 
 static char *local_buf = NULL;
-player_handler_t *av_handle = NULL;
 
 typedef struct {
 	int     channels;       /* number of audio channels */
@@ -1198,9 +1464,9 @@ static int lostream_init_callback(struct domain_init_hdr *hdr, void *data)
 	hdr->info.samplerate     = DEFAULT_SAMPLE_RATE;
 	hdr->info.channels 	 = DEFAULT_CHANNELS;
 	hdr->info.format 	 = AF_FORMAT_S16_LE;
-	printf("Audio ori samplerate: %d\n", hdr->info.samplerate);
-	printf("Audio ori channels: %d\n", hdr->info.channels);
-	printf("Audio ori format: %d\n", hdr->info.format);
+	printf("Audio cfg samplerate: %d\n", hdr->info.samplerate);
+	printf("Audio cfg channels: %d\n", hdr->info.channels);
+	printf("Audio cfg format: %d\n", hdr->info.format);
 
 	local_buf = malloc(BURSTSIZE);
 	if (local_buf == NULL) {
@@ -1258,19 +1524,23 @@ static struct loStream_callback localstream_cback = {
 	.stopStream     = lostream_stop_callback,
 };
 
-int avk_source_set_audio_output()
+int avk_source_set_audio_output(char *ao_iface)
 {
-	char *ao_iface = "stream:sockfile=/var/run/bt-av-stream.socket";
-	av_handle = mozart_player_handler_get("bsa", NULL, NULL);
-	if (!av_handle)
-		return -1;
+	player_handler_t *av_handle = NULL;
 
+	av_handle = mozart_player_handler_get("bsa", NULL, NULL);
+	if (!av_handle) {
+		printf("Error: mozart_player_handler_get failed!\n");
+		return -1;
+	}
 	mozart_player_aoswitch(av_handle, ao_iface);
+	mozart_player_handler_put(av_handle);
+
 	return 0;
 }
 
 struct localInStream  *loStream;
-static int mozart_avk_source_stream_init()
+int mozart_avk_source_stream_init()
 {
 	printf("avk source init create socket: %s\n", DEFAULT_SOCKET);
 	loStream = mozart_local_stream_create(DEFAULT_SOCKET, BURSTSIZE);
@@ -1279,6 +1549,363 @@ static int mozart_avk_source_stream_init()
 	return 0;
 }
 #endif /* SUPPORT_BSA_A2DP_SOURCE */
+
+#if (SUPPORT_WEBRTC == 1)
+static int mozart_hs_aec_init(hs_sample_param *aec, int sample_time)
+{
+	/* webrtc support:
+	 * rate: 8KHZ and 16KHZ
+	 * channel: 1
+	 * bits: 16 bit
+	 * sample_time: 10 ms
+	 * */
+	aec->actual.rate	= aec->hope.rate;
+	aec->actual.channel	= aec->hope.channel;
+	aec->actual.bits	= aec->hope.bits;
+	if (ingenic_apm_init(&aec->actual.rate, &aec->actual.channel, &aec->actual.bits, sample_time) < 0) {
+		printf("Error: ingenic_apm_init failed!!\n");
+		ingenic_apm_destroy();
+	}
+	return 0;
+}
+static int mozart_hs_aec_get_buf_length()
+{
+	return webrtc_aec_get_buffer_length();
+}
+static int mozart_hs_aec_calculate(hs_aec_param *hs_aec, char *ref_buf, char *record_buf, int sample_time)
+{
+	/* AEC calculate */
+	if (!hs_aec->outbuf) {
+		hs_aec->outbuf = malloc(hs_aec->outlen);
+		if (!hs_aec->outbuf) {
+			perror("aec_calculate malloc failed");
+			return -1;
+		}
+	}
+	webrtc_aec_calculate(record_buf, ref_buf, hs_aec->outbuf, sample_time);
+	if (!hs_aec->outbuf) {
+		printf("Error: hs_aec.outbuf is NULL, please checked!!\n");
+		return -1;
+	}
+
+	return 0;
+}
+static int mozart_hs_aec_uninit()
+{
+	ingenic_apm_destroy();
+	return 0;
+}
+#else /* SUPPORT_WEBRTC */
+static inline int mozart_hs_aec_init(hs_sample_param *aec, int sample_time) { return 0; }
+static inline int mozart_hs_aec_uninit() { return 0; }
+#endif /* SUPPORT_WEBRTC */
+
+#if (SUPPORT_BSA_HFP_HF == 1)
+static int mozart_hs_init_sample(hs_stream_msg *hs_msg)
+{
+	hs_msg->sample_time		= 10; /* ms */
+	/* config dsp */
+	hs_msg->dsp.hope.rate		= hs_msg->hs.hope.rate;
+	hs_msg->dsp.hope.channel	= hs_msg->hs.hope.channel;
+	hs_msg->dsp.hope.bits 		= hs_msg->hs.hope.bits;
+
+	/* config ref */
+	hs_msg->ref.hope.rate		= hs_msg->hs.hope.rate;
+	hs_msg->ref.hope.channel	= hs_msg->hs.hope.channel;
+	hs_msg->ref.hope.bits		= hs_msg->hs.hope.bits;
+	hs_msg->ref.volume		= 50;
+
+	/* config record */
+	hs_msg->record.hope.rate	= hs_msg->hs.hope.rate;
+	hs_msg->record.hope.channel	= hs_msg->hs.hope.channel;
+	hs_msg->record.hope.bits	= hs_msg->hs.hope.bits;
+	hs_msg->record.volume		= 50;
+
+	/* config aec */
+	hs_msg->aec.hope.rate		= hs_msg->hs.hope.rate;
+	hs_msg->aec.hope.channel	= hs_msg->hs.hope.channel;
+	hs_msg->aec.hope.bits		= hs_msg->hs.hope.bits;
+
+	return 0;
+}
+
+static int mozart_hs_uninit_resample_param(hs_resample_param *param)
+{
+	if (param->res.out_buf) {
+		free(param->res.out_buf);
+		param->res.out_buf = NULL;
+	}
+	if (param->rec.out_buf) {
+		free(param->rec.out_buf);
+		param->rec.out_buf = NULL;
+	}
+	if (param->res.resample_t) {
+		mozart_resample_uninit(param->res.resample_t);
+		param->res.resample_t = NULL;
+	}
+	if (param->rec.channel_t) {
+		mozart_channels_uninit(param->rec.channel_t);
+		param->rec.channel_t = NULL;
+	}
+	memset(param, 0, sizeof(hs_resample_param));
+
+	return 0;
+}
+
+static int mozart_hs_uninit_resample()
+{
+#if (SUPPORT_WEBRTC == 1)
+	mozart_hs_uninit_resample_param(&hs_ref);
+	mozart_hs_uninit_resample_param(&hs_aec.aec);
+	if(hs_aec.outbuf) {
+		free(hs_aec.outbuf);
+		hs_aec.outbuf = NULL;
+	}
+	memset(&hs_aec, 0, sizeof(hs_aec_param));
+#endif
+	mozart_hs_uninit_resample_param(&hs_bt);
+	mozart_hs_uninit_resample_param(&hs_record);
+
+	return 0;
+}
+
+static int mozart_hs_resample(hs_sample_param *source, hs_sample_param *dst, hs_resample_info *res)
+{
+	if (res->resample_t == NULL) {
+		res->resample_t = mozart_resample_init(source->actual.rate, source->actual.channel, source->actual.bits >> 3, dst->actual.rate);
+		if (res->resample_t == NULL) {
+			printf("Error: %s resample init failed\n", __func__);
+			return -1;
+		}
+	}
+	res->out_len = mozart_resample_get_outlen(res->in_len, source->actual.rate, source->actual.channel, source->actual.bits, dst->actual.rate);
+	if (res->out_buf == NULL) {
+		printf("hs malloc outbuf!\n");
+		res->out_buf   = malloc(res->out_len);
+		res->max_outlen = res->out_len;
+	} else {
+		if (res->out_len > res->max_outlen) {
+			printf("hs realloc outbuf!\n");
+			res->out_buf     = realloc(res->out_buf, res->out_len);
+			res->max_outlen = res->out_len;
+		}
+	}
+	return mozart_resample(res->resample_t, source->actual.channel, source->actual.bits, res->in_buf, res->in_len, res->out_buf);
+}
+
+static int mozart_hs_rechannel(hs_sample_param *source, hs_sample_param *dst, hs_rechannel_info *rec)
+{
+	if (rec->channel_t == NULL) {
+		rec->channel_t = mozart_channels_init(source->actual.channel, dst->actual.channel);
+		if (rec->channel_t == NULL) {
+			printf("Error: func: %s line: %d mozart channel int failed\n", __func__, __LINE__);
+			return -1;
+		}
+	}
+	rec->out_len = mozart_channels_get_outlen(rec->channel_t, rec->in_len);
+	if (rec->out_buf == NULL) {
+		printf("hs channel_outbuf == NULL !\n");
+		rec->out_buf    = malloc(rec->out_len);
+		rec->max_outlen = rec->out_len;
+	} else {
+		if (rec->out_len > rec->max_outlen) {
+			printf("hs realloc channel_outlen!\n");
+			rec->out_buf    = realloc(rec->out_buf, rec->out_len);
+			rec->max_outlen = rec->out_len;
+		}
+	}
+	mozart_channels(rec->channel_t, source->actual.bits>>3, 1, 0, rec->in_buf, rec->in_len, rec->out_buf);
+
+	return 0;
+}
+
+static int mozart_hs_event_cback(tBSA_HS_EVT event, void *p_data)
+{
+	switch (event) {
+		case BSA_HS_AUDIO_OPEN_EVT:
+			printf("BSA_HS_AUDIO_OPEN_EVT !\n");
+			device_prope *DevPrope = (device_prope *)p_data;
+
+			/* hs ori sample param
+			 * rate:	8\16 KHZ
+			 * channel:	1
+			 * bits:	16 bit
+			 * */
+			printf("BT sample rate: %d, channel: %d, bits: %d\n",
+					DevPrope->hs_msg.hs.hope.rate, DevPrope->hs_msg.hs.hope.channel, DevPrope->hs_msg.hs.hope.bits);
+
+			mozart_hs_init_sample(&DevPrope->hs_msg);
+			mozart_hs_aec_init(&DevPrope->hs_msg.aec, DevPrope->hs_msg.sample_time);
+			break;
+
+		case BSA_HS_AUDIO_CLOSE_EVT:
+			printf("BSA_HS_AUDIO_CLOSE_EVT !\n");
+			mozart_hs_aec_uninit();
+			mozart_hs_uninit_resample();
+			break;
+
+		default:
+			printf("%s Not handle this event!\n", __func__);
+			break;
+	}
+
+	return 0;
+}
+
+static char *mozart_hs_data_sample(hs_sample_param *sourc, hs_sample_param *dst,
+		hs_resample_param *hs_param, int *outlen)
+{
+	char *resample_outbuf = NULL;
+	int resample_outlen = 0;
+	char *rechannel_outbuf = NULL;
+	int rechannel_outlen = 0;
+	int inlen = hs_param->res.in_len;
+	char *inbuf = hs_param->res.in_buf;
+
+	/* No resample */
+	if ((sourc->actual.rate == dst->actual.rate)
+			&& (sourc->actual.channel == dst->actual.channel)
+			&& (sourc->actual.bits == dst->actual.bits)) {
+		rechannel_outbuf = inbuf;
+		rechannel_outlen = inlen;
+	/* Resample */
+	} else {
+		/* Resample rate */
+		if (sourc->actual.rate != dst->actual.rate) {
+			resample_outlen = mozart_hs_resample(sourc, dst, &hs_param->res);
+			resample_outbuf = hs_param->res.out_buf;
+		} else {
+			resample_outlen = inlen;
+			resample_outbuf = inbuf;
+		}
+
+		/* Resample channel */
+		if (sourc->actual.channel != dst->actual.channel) {
+			hs_param->rec.in_len = resample_outlen;
+			hs_param->rec.in_buf = resample_outbuf;
+			mozart_hs_rechannel(sourc, dst, &hs_param->rec);
+			rechannel_outbuf = hs_param->rec.out_buf;
+			rechannel_outlen = hs_param->rec.out_len;
+		} else {
+			rechannel_outbuf = resample_outbuf;
+			rechannel_outlen = resample_outlen;
+		}
+
+		/* Resample bits */
+		if (sourc->actual.bits != dst->actual.bits) {
+			printf("Error: %s not handle format, recv_bits: %d, cfg_bits: %d !!\n",
+					__func__, sourc->actual.bits, dst->actual.bits);
+			return NULL;
+		}
+	}
+	if (rechannel_outlen <= 0) {
+		printf("Error: rechannel_outlen <= 0, please checked!!\n");
+		return NULL;
+	}
+	if (!rechannel_outbuf) {
+		printf("Error: rechannel_outbuf is NULL, please checked!!\n");
+		return NULL;
+	}
+
+	*outlen = rechannel_outlen;
+	return rechannel_outbuf;
+}
+
+/* Data: BT ===>> DSP */
+static int mozart_hs_data_in_cback(hs_stream_msg *hs_msg)
+{
+	char *channel_outbuf = NULL;
+	int  channel_outlen = 0;
+
+	hs_bt.res.in_len = hs_msg->in.ilen;
+	hs_bt.res.in_buf = hs_msg->in.ibuf;
+	channel_outbuf = mozart_hs_data_sample(&hs_msg->hs, &hs_msg->dsp, &hs_bt, &channel_outlen);
+	if (!channel_outbuf) {
+		printf("Error: channel_outbuf is NULL, please checked!!!\n");
+		return -1;
+	}
+	hs_msg->in.olen = channel_outlen;
+	hs_msg->in.obuf = channel_outbuf;
+
+	return 0;
+}
+
+/* Data: Record + Ref ===>> AEC ===>> BT */
+static int mozart_hs_data_out_cback(hs_stream_msg *hs_msg)
+{
+	char *record_channel_outbuf = NULL;
+	int  record_channel_outlen = 0;
+
+#if (SUPPORT_WEBRTC == 1)
+	int ret = 0;
+	char *ref_channel_outbuf = NULL;
+	int  ref_channel_outlen = 0;
+	char *aec_channel_outbuf = NULL;
+	int  aec_channel_outlen = 0;
+
+	/* Ref resample */
+	hs_ref.res.in_len   = hs_msg->out.ref_len;
+	hs_ref.res.in_buf   = hs_msg->out.ref_buf;
+	ref_channel_outbuf = mozart_hs_data_sample(&hs_msg->ref, &hs_msg->aec, &hs_ref, &ref_channel_outlen);
+	if (!ref_channel_outbuf) {
+		printf("Error: ref_channel_outbuf is NULL, please checked!!!\n");
+		return -1;
+	}
+
+	/* Record resample */
+	hs_record.res.in_len   = hs_msg->out.record_len;
+	hs_record.res.in_buf   = hs_msg->out.record_buf;
+	record_channel_outbuf = mozart_hs_data_sample(&hs_msg->record, &hs_msg->aec, &hs_record, &record_channel_outlen);
+	if (!record_channel_outbuf) {
+		printf("Error: record_channel_outbuf is NULL, please checked!!!\n");
+		return -1;
+	}
+
+	/* AEC calculate */
+	if (!hs_aec.outlen) {
+		hs_aec.outlen = mozart_hs_aec_get_buf_length();
+		if(hs_aec.outlen <= 0) {
+			printf("Error: hs_aec.outlen <= 0, please checked!\n");
+			return -1;
+		}
+	}
+	if ((record_channel_outlen != hs_aec.outlen) || (ref_channel_outlen != hs_aec.outlen)) {
+		printf("Error: aec_outlen: %d, record_channel_outlen: %d, ref_channel_outlen: %d, please checked\n",
+				hs_aec.outlen, record_channel_outlen, ref_channel_outlen);
+		return -1;
+	}
+	ret = mozart_hs_aec_calculate(&hs_aec, ref_channel_outbuf, record_channel_outbuf, hs_msg->sample_time);
+	if (ret < 0) {
+		printf("Error: mozart_hs_aec_calculate failed!\n");
+		return -1;
+	}
+
+	/* AEC resample */
+	hs_aec.aec.res.in_len  = hs_aec.outlen;
+	hs_aec.aec.res.in_buf  = hs_aec.outbuf;
+	aec_channel_outbuf = mozart_hs_data_sample(&hs_msg->aec, &hs_msg->hs, &hs_aec.aec, &aec_channel_outlen);
+	if (!aec_channel_outbuf) {
+		printf("Error: aec_channel_outbuf is NULL, please checked!!!\n");
+		return -1;
+	}
+	hs_msg->out.out_buf = aec_channel_outbuf;
+	hs_msg->out.out_len = aec_channel_outlen;
+#else /* SUPPORT_WEBRTC */
+	/* Record resample */
+	hs_record.res.in_len   = hs_msg->out.record_len;
+	hs_record.res.in_buf   = hs_msg->out.record_buf;
+	record_channel_outbuf = mozart_hs_data_sample(&hs_msg->record, &hs_msg->hs, &hs_record, &record_channel_outlen);
+	if (!record_channel_outbuf) {
+		printf("Error: record_channel_outbuf is NULL, please checked!!!\n");
+		return -1;
+	}
+	hs_msg->out.out_buf = record_channel_outbuf;
+	hs_msg->out.out_len = record_channel_outlen;
+#endif /* SUPPORT_WEBRTC */
+
+	return 0;
+}
+#endif /* SUPPORT_BSA_HFP_HF */
 
 #if (SUPPORT_BSA_A2DP_SYNK == 1)
 static af_resample_t *avk_resample_t;
@@ -1469,7 +2096,11 @@ static void *thr_fn(void *args)
 		printf("hs service start failed.\n");
 		goto err_exit;
 	}
-
+	hs_cback_init_data hs_cback;
+	hs_cback.mozart_hs_evt_cback      = mozart_hs_event_cback;
+	hs_cback.mozart_hs_data_in_cback  = mozart_hs_data_in_cback;
+	hs_cback.mozart_hs_data_out_cback = mozart_hs_data_out_cback;
+	mozart_bluetooth_hs_init_callback(&hs_cback);
 #endif /* SUPPORT_BSA_HFP_HF */
 
 #if (SUPPORT_BSA_PBC == 1)
@@ -1477,16 +2108,15 @@ static void *thr_fn(void *args)
 #endif /* SUPPORT_BSA_PBC */
 
 #if (SUPPORT_BSA_A2DP_SYNK == 1)
-	avk_cback_init_data cback_data;
-	cback_data.mozart_avk_evt_cback  = mozart_avk_event_cback;
-	cback_data.mozart_avk_data_cback = mozart_avk_data_cback;
-	mozart_bluetooth_avk_int_callback(&cback_data);
+	avk_cback_init_data avk_cback;
+	avk_cback.mozart_avk_evt_cback  = mozart_avk_event_cback;
+	avk_cback.mozart_avk_data_cback = mozart_avk_data_cback;
+	mozart_bluetooth_avk_init_callback(&avk_cback);
 	if (mozart_bluetooth_avk_start_service()) {
 		printf("avk service start failed.\n");
 		goto err_exit;
 	}
 #endif /* SUPPORT_BSA_A2DP_SYNK */
-
 	mozart_bluetooth_set_visibility(discoverable, connectable);
 #if (SUPPORT_BSA_A2DP_SOURCE == 1)
 	int j = 0;
@@ -1495,11 +2125,12 @@ static void *thr_fn(void *args)
 	char *playlist_patch = "/mnt/sdcard";
 	char *disc_name = "SmartAudio-a23a13e1";
 	av_open_param av_param;
+	int duration = 3; /* Multiple of 1.28 seconds */
 
 	mozart_avk_source_stream_init();
 	mozart_bluetooth_av_start_service(playlist_patch);
 	for (j = 0; j < 5; j++) {
-		mozart_bluetooth_disc_start_regular();
+		mozart_bluetooth_disc_start_regular(duration);
 		for (i = 0; i < num; i++) {
 			if(bsa_start_regular_enable != 1)
 				usleep(200 * 1000);
@@ -1522,22 +2153,27 @@ static void *thr_fn(void *args)
 			}
 		}
 	}
-	if (disc_num != -1) {
-		av_param.select_num = 1;  /* Device found in last discovery */
-		av_param.device_index = disc_num;
-		mozart_bluetooth_av_open(&av_param);
-		for (i = 0; i < num; i++) {
-			if(bt_link_state != BT_LINK_CONNECTED)
-				usleep(200*1000);
-			else {
-				break;
+	for (j = 0; j < 5; j++) {
+		if (disc_num != -1) {
+			av_param.select_num = 1;  /* Device found in last discovery */
+			av_param.device_index = disc_num;
+			mozart_bluetooth_av_open(&av_param);
+			for (i = 0; i < num; i++) {
+				if(bt_av_link_state == BT_LINK_CONNECT_FAILED) {
+					printf("mozart_bluetooth_av_open failed!\n");
+					break;
+				} else if (bt_av_link_state == BT_LINK_CONNECTED) {
+					printf("av link successful!\n");
+					goto link_connected;
+				} else if (bt_av_link_state == BT_LINK_DISCONNECTED)
+					usleep(200*1000);
+				else {
+					printf("Not handle bt_av_link_state: %d\n", bt_av_link_state);
+				}
 			}
 		}
-		if (i > num) {
-			printf("mozart_bluetooth_av_open failed!\n");
-			return NULL;
-		}
 	}
+link_connected:
 #endif /* SUPPORT_BSA_A2DP_SOURCE */
 
 #if (SUPPORT_BSA_OPS == 1)
@@ -1554,9 +2190,11 @@ static void *thr_fn(void *args)
 	opc_push_param opc_param;
 	int j = 0;
 	int num = 50;
+	int duration = 3; /* Multiple of 1.28 seconds */
+
 	mozart_bluetooth_opc_start();
 	for (j = 0; j < 5; j++) {
-		mozart_bluetooth_disc_start_regular();
+		mozart_bluetooth_disc_start_regular(duration);
 		for (i = 0; i < num; i++) {
 			if(bsa_start_regular_enable != 1)
 				usleep(200 * 1000);
@@ -1589,8 +2227,8 @@ static void *thr_fn(void *args)
 	char *service_name = "BluetoothChatSecure";
 	dg_start_service_paramters dg_service;
 	memset(&dg_service, 0, sizeof(dg_start_service_paramters));
-	//char *spps_uuid = "00001101-0000-1000-8000-00805F9B34FB"; /* standard 128bit SPP UUID (16bit: 0x1101) */
-	char *spps_uuid = "FA87C0D0-AFAC-11DE-8A39-0800200C9A66"; /* for Android App BluetoothChatSecure */
+	char *spps_uuid = "00001101-0000-1000-8000-00805F9B34FB"; /* standard 128bit SPP UUID (16bit: 0x1101) */
+	//char *spps_uuid = "FA87C0D0-AFAC-11DE-8A39-0800200C9A66"; /* for Android App BluetoothChatSecure */
 	sscanf (spps_uuid, "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
 			&dg_service.uuid[0], &dg_service.uuid[1], &dg_service.uuid[2], &dg_service.uuid[3],
 			&dg_service.uuid[4], &dg_service.uuid[5], &dg_service.uuid[6], &dg_service.uuid[7],
@@ -1604,16 +2242,16 @@ static void *thr_fn(void *args)
 #else
 	mozart_bluetooth_dg_callback(NULL);
 #endif /* SUPPORT_BSA_SPPS */
-
 #if (SUPPORT_BSA_SPPC == 1)
 	int j = 0;
 	int num = 50;
+	int duration = 3; /* Multiple of 1.28 seconds */
 	int disc_num = -1;
 	char *disc_name = "SmartAudio-a23a144d";
 
 	mozart_bluetooth_dg_start();
 	for (j = 0; j < 5; j++) {
-		mozart_bluetooth_disc_start_services(BSA_SPP_SERVICE_MASK);
+		mozart_bluetooth_disc_start_services(BSA_SPP_SERVICE_MASK, duration);
 		while(bsa_start_regular_enable != 1) {
 			usleep(200 * 1000);
 		}
@@ -1629,85 +2267,50 @@ static void *thr_fn(void *args)
 		}
 	}
 	if (disc_num != -1) {
-		char *connect_name = "BluetoothChatSecure";
-		char *connect_uuid = "FA87C0D0-AFAC-11DE-8A39-0800200C9A66";
+		int i = 0;
+		BOOLEAN flag = 0;
+		char connect_uuid[] = {0x00, 0x00, 0x11, 0x01, 0x00, 0x00, 0x10, 0x00,
+			0x80, 0x00, 0x00, 0x80, 0x5F, 0x9B, 0x34, 0xFB}; /* standard 128bit SPP UUID (16bit: 0x1101) */
+		/* char connect_uuid[] = {0xFA, 0x87, 0xC0, 0xD0, 0xAF, 0xAC, 0x11, 0xDE,
+			0x8A, 0x39, 0x08, 0x00, 0x20, 0x0C, 0x9A, 0x66}; */ /* for Android App BluetoothChatSecure */
+
 		dg_open_paramters dg_parm = {};
 		dg_parm.connect_type = DEVICE_FROM_DISCOVERY;
 		dg_parm.device_index = disc_num;
 		dg_parm.param.service = BSA_SPP_SERVICE_ID;
-		sscanf (connect_uuid, "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-				&dg_parm.uuid[0], &dg_parm.uuid[1], &dg_parm.uuid[2], &dg_parm.uuid[3],
-				&dg_parm.uuid[4], &dg_parm.uuid[5], &dg_parm.uuid[6], &dg_parm.uuid[7],
-				&dg_parm.uuid[8], &dg_parm.uuid[9], &dg_parm.uuid[10], &dg_parm.uuid[11],
-				&dg_parm.uuid[12], &dg_parm.uuid[13], &dg_parm.uuid[14], &dg_parm.uuid[15]);
-		dg_parm.param.sec_mask = BSA_SEC_AUTHENTICATION;
-		memcpy(dg_parm.param.service_name, connect_name, strlen(connect_name));
-		mozart_bluetooth_dg_open_connection(&dg_parm);
-		for (i = 0; i < num; i++) {
-			if(bt_link_state != BT_LINK_CONNECTED)
-				usleep(200 * 1000);
-			else {
-				break;
+		flag = sdpu_is_base_uuid(connect_uuid);
+		if (flag) {
+			printf("uuid is base uuid !!\n");
+			dg_parm.is_128uuid = false;
+		} else {
+			char *connect_name = "BluetoothChatSecure";
+			printf("uuid is not base uuid !!\n");
+			for (i = 0; i < MAX_UUID_SIZE; i++) {
+				dg_parm.uuid[i] = connect_uuid[i];
+			}
+			memcpy(dg_parm.param.service_name, connect_name, strlen(connect_name));
+			dg_parm.is_128uuid = true;
+		}
+		dg_parm.param.sec_mask = BSA_SEC_NONE;
+		for (j = 0; j < 5; j++) {
+			bt_dg_flag = DG_IDLE;
+			mozart_bluetooth_dg_open_connection(&dg_parm);
+			for (i = 0; i < num; i++) {
+				if(bt_dg_flag == DG_IDLE)
+					usleep(200 * 1000);
+				else if (bt_dg_flag == DG_CONNECTED) {
+					goto connect_success;
+				} else if (bt_dg_flag == DG_CONNECT_FAILED) {
+					break;
+				}
 			}
 		}
-		if (i > num) {
-			printf("mozart_bluetooth_dg_open_connection failed!\n");
-			return NULL;
-		}
+connect_success:
+		bt_dg_flag = DG_IDLE;
 	}
 #endif /* SUPPORT_BSA_SPPC */
-
-#if (SUPPORT_BSA_HS_RESAMPLE == 1)
-	mozart_hs_get_default_sampledata(&hs_sample_data);
-#if (SUPPORT_BSA_HS_RESAMPLE_8K_to_48K == 1)
-//HZB add
-#if (BT_CALL_RESAMPLE_96K == 1)
-	hs_resample_data.resample_rate = 24000;
-#else
-	hs_resample_data.resample_rate = 48000;
-#endif
-
-	hs_resample_s = mozart_resample_init(hs_sample_data.sample_rate, hs_sample_data.sample_channel, hs_sample_data.sample_bits>>3, hs_resample_data.resample_rate);
-	if(hs_resample_s == NULL){
-		printf("ERROR: mozart resample inti failed\n");
-		goto err_exit;
-	}
-#else
-	hs_resample_data.resample_rate = hs_sample_data.sample_rate;
-#endif /* SUPPORT_BSA_HS_RESAMPLE_8K_to_48K */
-
-	hs_resample_data.resample_bits = hs_sample_data.sample_bits;
-	hs_resample_data.resample_channel = hs_sample_data.sample_channel;
-	hs_resample_data.resample_enable = 1;
-	hs_resample_data.mozart_hs_resample_data_cback = mozart_hs_resample_data_callback;
-
-	mozart_bluetooth_hs_set_resampledata_callback(&hs_resample_data);
-#endif /* SUPPORT_BSA_HS_RESAMPLE */
-
-#if ((SUPPORT_AEC_RESAMPLE == 1) && (SUPPORT_AEC_RESAMPLE_48K_TO_8K == 1))
-	mozart_aec_get_bt_default_sampledata(&bt_aec_sdata);
-	bt_aec_rdata.resample_rate = bt_aec_sdata.sample_rate;
-	bt_aec_rdata.resample_bits = bt_aec_sdata.sample_bits;
-	bt_aec_rdata.resample_channel = bt_aec_sdata.sample_channel;
-	bt_aec_rdata.resample_time = 10; /* ms, resample_time is must equal to record time */
-
-	bt_aec_sdata.sample_rate = hs_resample_data.resample_rate;
-	bt_aec_sdata.sample_bits = hs_resample_data.resample_bits;
-	bt_aec_sdata.sample_channel = hs_resample_data.resample_channel;
-	aec_resample_s = mozart_resample_init(bt_aec_sdata.sample_rate, bt_aec_sdata.sample_channel, bt_aec_sdata.sample_bits>>3, bt_aec_rdata.resample_rate);
-	if(aec_resample_s == NULL) {
-		printf("ERROR: mozart resample inti failed\n");
-		goto err_exit;
-	}
-
-	bt_aec_rdata.resample_enable = 1;
-	bt_aec_rdata.aec_resample_data_cback = mozart_bt_aec_resample_data_callback;
-	mozart_aec_set_bt_resampledata_callback(&bt_aec_rdata);
-#endif /* SUPPORT_AEC_RESAMPLE */
 #if (SUPPORT_BSA_BLE == 1)
 	int state = 0;
-	usleep(500*1000);
-
 	state = mozart_bluetooth_ble_start();
 	if (state) {
 		printf("mozart_bluetooth_ble_start failed, state = %d.\n", state);
@@ -1748,7 +2351,6 @@ static void *thr_fn(void *args)
 #endif /* SUPPORT_BT */
 
 err_exit:
-
 	return NULL;
 }
 
@@ -1758,25 +2360,14 @@ int start_bt(void)
 	pthread_t p_tid;
 
 	system("/usr/fs/etc/init.d/S04bsa.sh start");
-#if (SUPPORT_WEBRTC == 1)
-	bt_ac.aec_init = (aec_func_t)ingenic_apm_init;
-	bt_ac.aec_destroy = (aec_func_t)ingenic_apm_destroy;
-	bt_ac.aec_enable = (aec_func_t)webrtc_aec_enable;
-	bt_ac.aec_get_buffer_length = (aec_func_t)webrtc_aec_get_buffer_length;
-	bt_ac.aec_calculate = webrtc_aec_calculate;
-
-	mozart_aec_callback(&bt_ac);
-#else
-	mozart_aec_callback(NULL);
-#endif
-
 #if (SUPPORT_BSA_BLE == 1)
 	bt_ble_callback ble_cback = {};
+	bsa_ble_cb = mozart_bluetooth_ble_get_cb();
 #if (SUPPORT_BSA_BLE_CLIENT == 1)
-	ble_cback.ble_common_profile_cback = ble_common_profile_cback;
+	ble_cback.ble_client_profile_cback = bsa_ble_client_profile_cback;
 #endif
 #if (SUPPORT_BSA_BLE_SERVER == 1)
-	ble_cback.ble_ser_write_cback = bt_ble_server_write_cback;
+	ble_cback.ble_server_profile_cback = bsa_ble_server_profile_cback;
 #endif
 	mozart_bluetooth_ble_callback(&ble_cback);
 #else
@@ -1807,12 +2398,6 @@ int stop_bt(void)
 	mozart_bluetooth_pbc_stop();
 #endif
 	mozart_bluetooth_uninit();
-#if ((SUPPORT_BSA_HS_RESAMPLE == 1) && (SUPPORT_BSA_HS_RESAMPLE_8K_to_48K == 1))
-	mozart_resample_uninit(hs_resample_s);
-#endif
-#if ((SUPPORT_AEC_RESAMPLE == 1) && (SUPPORT_AEC_RESAMPLE_48K_TO_8K == 1))
-	mozart_resample_uninit(aec_resample_s);
-#endif
 	system("/usr/fs/etc/init.d/S04bsa.sh stop");
 
 	return 0;

@@ -69,6 +69,11 @@ extern "C" {
 		 */
 		player_status_t status;
 		/**
+		 * @brief status code, 0:no error, 100~600:http status code,
+		 * 800:DNS resolve fail, 801:connection timeout, 802:connect error.
+		 */
+		int st_code;
+		/**
 		 * @brief Current play position.
 		 */
 		int position;
@@ -217,6 +222,14 @@ extern "C" {
 	 */
 	extern int mozart_player_seek(player_handler_t *handler, int position);
 
+	/** @brief send PLAYER_STOPPED status after all mplayer resource release or only close dsp.
+	 *
+	 * @param handler [in] player handler
+	 * @param val [in] 0 represent stop only wait dsp closed Otherwise,stop wait all mplayer resource release
+	 *
+	 * @return return 0 on success, return -1 otherwise
+	 */
+	int mozart_player_stop_wait_release(player_handler_t *handler, int val);
 	/**
 	 * @brief stop the music, you will recieve PLAYER_STOPPED status on callback.
 	 *

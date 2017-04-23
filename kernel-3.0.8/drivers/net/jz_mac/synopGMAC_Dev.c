@@ -47,7 +47,7 @@ s32 synopGMAC_set_mdc_clk_div(synopGMACdevice *gmacdev,u32 clk_div_val)
 	while(((orig_data = synopGMACReadReg((u32 *)gmacdev->MacBase,GmacGmiiAddr)) & GmiiBusy) && (times-- > 0)) {
 		printk("===>PHY busy!\n");
 	}
-	orig_data &= (~ GmiiCsrClkMask);
+	orig_data &= (~GmiiCsrClkMask);
 	orig_data |= clk_div_val;
 	synopGMACWriteReg((u32 *)gmacdev->MacBase, GmacGmiiAddr ,orig_data);
 	return 0;
@@ -68,7 +68,53 @@ u32 synopGMAC_get_mdc_clk_div(synopGMACdevice *gmacdev)
 	return data;
 }
 
+/**
+ * struct GmiiCsrDiv
+ */
+typedef struct GmiiCisrDivStruct {
+	u32 CsrClkDiv;
+	u32 CsrRegValue;
+} GmiiCsrDiv;
 
+/**
+ * GmacCsrDivArray
+ *
+ * Note:
+ *	GmacCsrDivArray is descending order baseed on
+ *	GmacCsrDivArray.CsrClkDiv.
+ */
+static GmiiCsrDiv GmacCsrDivArray[] = {
+	{ 124, GmiiCsrClk5 }, /* sysclk is 250-300 MHz */
+	{ 102, GmiiCsrClk4 }, /* sysclk is 150-250 MHz */
+	{ 62, GmiiCsrClk1 }, /* sysclk is 100-150 MHz */
+	{ 42, GmiiCsrClk0 }, /* sysclk is 60-100 MHz */
+	{ 26, GmiiCsrClk3 }, /* sysclk is 35-60 MHz */
+	{ 16, GmiiCsrClk2 }, /* sysclk is 20-35 MHz */
+	{ 14, 0x00000034 },
+	{ 12, 0x00000030 },
+	{ 10, 0x0000002C },
+	{ 8, 0x00000028 },
+	{ 6, 0x00000024 },
+	{ 4, 0x00000020 },
+};
+
+/**
+ * Function to Calculate the GMIIAddressRegister.CR[5:2] right value
+ * @sysclk[in]
+ * @max_mdcclk[in]
+ * \return Returns 0xFFFFFFFF on out of band else return a rigth value.
+ */
+u32 synopGMAC_calculate_mdc_clk_csr(u32 sysclk, u32 max_mdcclk)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(GmacCsrDivArray); i++) {
+		if (sysclk > max_mdcclk * GmacCsrDivArray[i].CsrClkDiv)
+			return i ? GmacCsrDivArray[i - 1].CsrRegValue : ~(u32)0;
+	}
+
+	return GmacCsrDivArray[i - 1].CsrRegValue;
+}
 
 /**
  * Function to read the Phy register. The access to phy register
@@ -770,7 +816,7 @@ void synopGMAC_src_addr_filter_disable(synopGMACdevice * gmacdev)
  */
 void synopGMAC_dst_addr_filter_inverse(synopGMACdevice * gmacdev)
 {
-	synopGMACSetBits((u32 *)gmacdev->MacBase, GmacFrameFilter, GmacDestAddrFilterNor);
+	synopGMACSetBits((u32 *)gmacdev->MacBase, GmacFrameFilter, GmacDestAddrFilter);
 	return;
 }
 /**
@@ -780,7 +826,7 @@ void synopGMAC_dst_addr_filter_inverse(synopGMACdevice * gmacdev)
  */
 void synopGMAC_dst_addr_filter_normal(synopGMACdevice * gmacdev)
 {
-	synopGMACClearBits((u32 *)gmacdev->MacBase, GmacFrameFilter, GmacDestAddrFilterNor);
+	synopGMACClearBits((u32 *)gmacdev->MacBase, GmacFrameFilter, GmacDestAddrFilter);
 	return;
 }
 

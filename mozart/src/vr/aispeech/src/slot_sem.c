@@ -49,6 +49,8 @@ void _free_sem_music(sem_music_t *music){
 	music->operation= NULL;
 	free(music->volume);
 	music->volume= NULL;
+	free(music->tgt);
+	music->tgt= NULL;
 }
 
 void _free_sem_weather(sem_weather_t *weather){
@@ -322,6 +324,9 @@ void _get_sem_music(json_object *param, sem_music_t *music){
 	json_object *number = NULL;
 	json_object *operation = NULL;
 	json_object *volume = NULL;
+	json_object *act = NULL;
+	json_object *tgt = NULL;
+
 	if (json_object_object_get_ex(param, "歌手名", &artist)){
 		if (json_object_get_string(artist)){
 			music->artist = strdup(json_object_get_string(artist));
@@ -362,6 +367,13 @@ void _get_sem_music(json_object *param, sem_music_t *music){
 			music->volume = strdup(json_object_get_string(volume));
 		}
 	}
+	if (json_object_object_get_ex(param, "__act__", &act)){
+		if (strcmp(json_object_get_string(act), "request") == 0) {
+			if (json_object_object_get_ex(param, "__tgt__", &tgt))
+				if (json_object_get_string(tgt))
+					music->tgt = strdup(json_object_get_string(tgt));
+		}
+	}
 #ifdef DEBUG_SHOW_ALL
 	if (music->artist)
 		DEBUG("artist = %s\n", music->artist);
@@ -379,7 +391,8 @@ void _get_sem_music(json_object *param, sem_music_t *music){
 		DEBUG("operation = %s\n", music->operation);
 	if (music->volume)
 		DEBUG("volume = %s\n", music->volume);
-
+	if (music->tgt)
+		DEBUG("tgt = %s\n", music->tgt);
 #endif
 }
 

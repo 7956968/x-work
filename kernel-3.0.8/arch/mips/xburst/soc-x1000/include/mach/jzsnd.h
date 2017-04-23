@@ -118,7 +118,7 @@ struct akm4345_platform_data {
 };
 #endif
 
-#ifdef CONFIG_SND_ASOC_JZ_EXTCODEC_NPCA110P
+#if (defined(CONFIG_SND_ASOC_JZ_EXTCODEC_NPCA110P) || defined(CONFIG_NPCA110P_EXTERNAL_CODEC))
 #define LOW_ENABLE                      0
 #define HIGH_ENABLE                     1
 struct npca110p_platform_data {
@@ -127,6 +127,13 @@ struct npca110p_platform_data {
 };
 #endif
 
+#ifdef CONFIG_ES8374_EXTERNAL_CODEC
+#define LOW_ENABLE						0
+#define HIGH_ENABLE						1
+struct es8374_platform_data {
+	struct snd_board_gpio * i2c_address;
+};
+#endif
 /*####################################################*\
 * common, used for sound devices
 \*####################################################*/

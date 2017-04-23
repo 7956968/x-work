@@ -11,15 +11,15 @@ typedef enum {
 } mulroom_ao_mode_t;
 
 /**
- * mozart_mulroom_audio_change -
+ * module_mulroom_audio_change -
  * @mode:
  */
-extern int mozart_mulroom_audio_change(mulroom_ao_mode_t mode);
+extern int module_mulroom_audio_change(mulroom_ao_mode_t mode);
 
 /**
- * mozart_mulroom_run_ntpd -
+ * module_mulroom_run_ntpd -
  */
-extern int mozart_mulroom_run_ntpd(void);
+extern int module_mulroom_run_ntpd(void);
 
 #ifdef  __cplusplus
 }

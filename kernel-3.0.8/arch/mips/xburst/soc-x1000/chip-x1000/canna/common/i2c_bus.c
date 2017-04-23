@@ -83,9 +83,8 @@ struct i2c_board_info jz_i2c1_devs[] __initdata = {
 };
 int jz_i2c1_devs_size = ARRAY_SIZE(jz_i2c1_devs);
 #endif
-
 #if (defined(CONFIG_SOFT_I2C2_GPIO_V12_JZ) || defined(CONFIG_I2C2_V12_JZ))
-#ifdef CONFIG_SND_ASOC_JZ_EXTCODEC_NPCA110P
+#if (defined(CONFIG_SND_ASOC_JZ_EXTCODEC_NPCA110P) || defined(CONFIG_NPCA110P_EXTERNAL_CODEC))
 static struct snd_board_gpio power_pin = {
         .gpio = GPIO_NPCA110P_POWER,
         .active_level = LOW_ENABLE,
@@ -113,7 +112,7 @@ struct i2c_board_info jz_i2c2_devs[] __initdata = {
 		.platform_data  = &wm8594_codec_pdata,
 	},
 #endif
-#ifdef CONFIG_SND_ASOC_JZ_EXTCODEC_NPCA110P
+#if (defined(CONFIG_SND_ASOC_JZ_EXTCODEC_NPCA110P) || defined(CONFIG_NPCA110P_EXTERNAL_CODEC))
         {
                 I2C_BOARD_INFO("npca110p", 0x73),
                 .platform_data  = &npca110p_data,
@@ -157,6 +156,10 @@ MODULE_LICENSE("GPL");
         .id = NO,                       \
         .dev    = { .platform_data = &i2c##NO##_gpio_data,},    \
     };
+
+#ifdef CONFIG_SOFT_I2C2_GPIO_V12_JZ
+DEF_GPIO_I2C(2);
+#endif
 #ifdef CONFIG_SOFT_I2C1_GPIO_V12_JZ
 DEF_GPIO_I2C(1);
 #endif

@@ -101,3 +101,11 @@ struct platform_device tas5010_device = {
 		.name = "tas5010_codec",
 };
 #endif
+#ifdef CONFIG_ES8374_EXTERNAL_CODEC
+struct snd_codec_data es8374_codec_data = {
+	.gpio_spk_en = {.gpio = GPIO_ES8374_SPEAKER_EN, .active_level = GPIO_ES8374_SPEAKER_EN_LEVEL},
+};
+struct platform_device es8374_device = {
+	.name = "es8374_codec",
+};
+#endif

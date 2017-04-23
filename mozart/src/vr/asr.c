@@ -88,6 +88,7 @@ static void set_record_file_head()
 	fd_dmic = open(name2, O_RDWR | O_CREAT | O_TRUNC);
 	init_wave_head(wave, ASR_RATE, ASR_BIT, ASR_CHANNEL, 0);
 	set_wave_head(fd_dmic, wave);
+	free(wave);
 }
 #endif
 
@@ -140,7 +141,7 @@ static unsigned long soundcard_asr_record(char *dmic_buf, unsigned long len)
 	return mozart_record(record, dmic_buf, ASR_SIZE);
 }
 
-int mozart_asr_start(void)
+int mozart_asr_start(bool sds)
 {
 	char dmic_buf[ASR_SIZE] = {};
 	asr_stop_flag = false;
@@ -150,7 +151,7 @@ int mozart_asr_start(void)
 	soundcard_init();
 
 	/* real asr start */
-	asr_start();
+	asr_start(sds);
 	printf("===> ASR: What can I do for you?\n");
 	while (!asr_stop_flag && !asr_break_flag) {
 		soundcard_asr_record(dmic_buf, ASR_SIZE);

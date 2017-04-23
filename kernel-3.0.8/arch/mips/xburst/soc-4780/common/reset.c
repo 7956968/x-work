@@ -129,7 +129,7 @@ void inline reset_keep_power(int keep_pwr)
 			      inl(RTC_IOBASE + RTC_PWRONCR) & ~(1 << 0));
 }
 
-#define HWFCR_WAIT_TIME(x) ((x > 0x7fff ? 0x7fff: (0x7ff*(x)) / 2000) << 5)
+#define HWFCR_WAIT_TIME(x) ((x > 0x7ff ? 0x7ff: (0x7ff*(x)) / 2000) << 5)
 #ifdef CONFIG_BOARD_H600S
 static void poweroff_inand(void) {
 	printk("inand power off");

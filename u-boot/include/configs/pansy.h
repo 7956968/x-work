@@ -1,4 +1,4 @@
-3/*
+/*
  * Ingenic mensa configuration
  *
  * Copyright (c) 2013 Ingenic Semiconductor Co.,Ltd
@@ -83,7 +83,6 @@
 #define CONFIG_MDDR_EMD56164PC_50I
 #endif
 
-#define CONFIG_AUDIO_CAL_DIV
 #define CONFIG_AUDIO_APLL CONFIG_SYS_APLL_FREQ
 #define CONFIG_AUDIO_MPLL CONFIG_SYS_MPLL_FREQ
 

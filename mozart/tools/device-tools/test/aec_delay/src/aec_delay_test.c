@@ -126,6 +126,7 @@ static int soundcard_init(void)
 		.rates = RATE,
 		.channels = 1,
 		.volume = 80,
+		.is_resample = true,
 	};
 
 	if (get_audio_type() == AUDIO_ALSA)

@@ -13,6 +13,7 @@
 #include <mach/jzmmc.h>
 #include <mach/jzssi.h>
 #include <mach/jz_efuse.h>
+#include <mach/jzeth_phy.h>
 #include <gpio.h>
 #include <linux/jz_dwc.h>
 #include <linux/interrupt.h>
@@ -60,6 +61,42 @@ struct platform_device jz_leds_gpio = {
 	},
 };
 #endif
+
+#ifdef CONFIG_JZ_MAC
+#ifndef CONFIG_MDIO_GPIO
+static struct jz_ethphy_feature ethphy_feature = {
+#ifdef CONFIG_JZGPIO_PHY_RESET
+	.phy_hwreset = {
+		.gpio		= GMAC_PHY_PORT_GPIO,
+		.active_level	= GMAC_PHY_ACTIVE_HIGH,
+		.delaytime_msec	= GMAC_PHY_DELAYTIME,
+	},
+#endif
+	.mdc_mincycle = 80, /* 80ns */
+};
+
+struct platform_device jz_mii_bus = {
+	.name = "jz_mii_bus",
+	.dev.platform_data = &ethphy_feature,
+};
+#else /* CONFIG_MDIO_GPIO */
+static struct mdio_gpio_platform_data mdio_gpio_data = {
+	.mdc = MDIO_MDIO_MDC_GPIO,
+	.mdio = MDIO_MDIO_GPIO,
+	.phy_mask = 0,
+	.irqs = { 0 },
+};
+
+struct platform_device jz_mii_bus = {
+	.name = "mdio-gpio",
+	.dev.platform_data = &mdio_gpio_data,
+};
+#endif /* CONFIG_MDIO_GPIO */
+struct platform_device jz_mac_device = {
+	.name = "jz_mac",
+	.dev.platform_data = &jz_mii_bus,
+};
+#endif /* CONFIG_JZ_MAC */
 
 #ifdef CONFIG_JZ_EFUSE_V12
 struct jz_efuse_platform_data jz_efuse_pdata = {

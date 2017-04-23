@@ -178,6 +178,22 @@ int dwc2_get_id_level(struct dwc2 *dwc)
 EXPORT_SYMBOL_GPL(dwc2_get_id_level);
 
 #if DWC2_DEVICE_MODE_ENABLE
+#if (CONFIG_USB_AUDIO == m)
+static int sw_plugin;
+static void dwc2_sent_plug_uevent(struct dwc2_jz *jz ,int plugin)
+{
+	char *disconnected[2] = { "USB_STATE=DISCONNECTED", NULL };
+	char *connected[2]    = { "USB_STATE=CONNECTED", NULL };
+	char **uevent_envp = NULL;
+	if (plugin != sw_plugin)
+		uevent_envp = plugin ? connected : disconnected;
+	sw_plugin = plugin;
+	if (uevent_envp) {
+		kobject_uevent_env(&jz->dev->kobj, KOBJ_CHANGE, uevent_envp);
+		pr_info("%s: sent uevent %s\n", __func__, uevent_envp[0]);
+	}
+}
+#endif
 extern void dwc2_gadget_plug_change(int plugin);
 static void usb_plug_change(struct dwc2_jz *jz) {
 
@@ -188,6 +204,9 @@ static void usb_plug_change(struct dwc2_jz *jz) {
 	synchronize_irq(dwc->irq);
 	flush_work(&dwc->otg_id_work);
 	dwc2_gadget_plug_change(insert);
+#if (CONFIG_USB_AUDIO == m)
+	dwc2_sent_plug_uevent(jz ,insert);
+#endif
 	if (!jz_otg_phy_is_suspend())
 		dwc2_enable_global_interrupts(dwc);
 }
@@ -202,7 +221,21 @@ static irqreturn_t usb_detect_interrupt(int irq, void *dev_id)
 	mutex_unlock(&jz->irq_lock);
 	return IRQ_HANDLED;
 }
+#if (CONFIG_USB_AUDIO == m)
+static ssize_t state_show(struct device *dev,struct device_attribute *attr,char *buf)
+{
+	char *state = "DISCONNECTED";
+	struct dwc2_jz *jz = dev_get_drvdata(dev);
+	int insert = __dwc2_get_detect_pin_status(jz);
+	if(insert)
+		state = "CONNECTED";
+	else
+		state = "DISCONNECTED";
+	return sprintf(buf, "%s\n", state);
+}
 
+static DEVICE_ATTR(state, S_IRUSR |  S_IRGRP | S_IROTH, state_show, NULL);
+#endif
 #endif /* !DWC2_DEVICE_MODE_ENABLE */
 
 #if DWC2_HOST_MODE_ENABLE
@@ -408,6 +441,11 @@ static struct attribute *dwc2_jz_attributes[] = {
 	&dev_attr_vbus.attr,
 	&dev_attr_id.attr,
 #endif	/*DWC2_HOST_MODE_ENABLE*/
+#if DWC2_DEVICE_MODE_ENABLE
+#if (CONFIG_USB_AUDIO == m)
+	&dev_attr_state,
+#endif
+#endif
 	NULL
 };
 
@@ -478,6 +516,9 @@ static int dwc2_jz_probe(struct platform_device *pdev) {
 	} else {
 		dwc2_plat_data->keep_phy_on = 1;
 	}
+#if (CONFIG_USB_AUDIO == m)
+	sw_plugin = __dwc2_get_detect_pin_status(jz);
+#endif
 #endif	/* DWC2_DEVICE_MODE_ENABLE */
 
 	jz->id_irq = -1;

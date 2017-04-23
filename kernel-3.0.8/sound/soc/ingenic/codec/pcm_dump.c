@@ -30,15 +30,13 @@ static struct snd_soc_dai_driver dump_codec_dai = {
 		.channels_min = 1,
 		.channels_max = 1,
 		.rates = SNDRV_PCM_RATE_8000_192000,
-		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S18_3LE | SNDRV_PCM_FMTBIT_S20_3LE |
-			SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S8,
+		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S18_3LE | SNDRV_PCM_FMTBIT_S20_3LE 			| SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S8,
 	},
 	.capture = {
 		.channels_min = 1,
 		.channels_max = 1,
 		.rates = SNDRV_PCM_RATE_8000_192000,
-		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S18_3LE | SNDRV_PCM_FMTBIT_S20_3LE |
-			SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S8,
+		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S18_3LE | SNDRV_PCM_FMTBIT_S20_3LE 			| SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S8,
 	},
 };
 
@@ -57,7 +55,7 @@ static int dump_platform_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static struct platform_driver dlv4780_codec_driver = {
+static struct platform_driver pcm_codec_driver = {
 	.driver = {
 		.name = "pcm dump",
 		.owner = THIS_MODULE,
@@ -66,15 +64,15 @@ static struct platform_driver dlv4780_codec_driver = {
 	.remove = dump_platform_remove,
 };
 
-static int dump_modinit(void)
+static int dump_init(void)
 {
-	return platform_driver_register(&dlv4780_codec_driver);
+	return platform_driver_register(&pcm_codec_driver);
 }
-module_init(dump_modinit);
+module_init(dump_init);
 
 static void dump_exit(void)
 {
-	platform_driver_unregister(&dlv4780_codec_driver);
+	platform_driver_unregister(&pcm_codec_driver);
 }
 module_exit(dump_exit);
 

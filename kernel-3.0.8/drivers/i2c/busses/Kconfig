@@ -920,11 +920,9 @@ config I2C2_V12_JZ
 choice
         prompt "JZ_v12 i2c controler 2  function pins select"
         depends on I2C2_V12_JZ
-        default I2C2_PA
-config I2C3_PA
-        bool "GPIO_PA16 & GPIO_PA17"
-config I2C3_PE
-        bool "GPIO_PE0 & GPIO_PE3"
+        default I2C2_PD
+config I2C2_PD
+        bool "GPIO_PD0 & GPIO_PD1"
 endchoice
 
 config I2C2_SPEED

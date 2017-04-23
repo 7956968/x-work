@@ -90,6 +90,15 @@
 #define GPIO_NPCA110P_POWER	-1		 /* MPCA110P POWER ON pin */
 #define GPIO_NPCA110P_RESET	GPIO_PC(22)	 /* NPCA110P RESET pin */
 #endif
+
+/* There is no NPCA110P on canna board, you should modify the code on your board */
+#ifdef CONFIG_NPCA110P_EXTERNAL_CODEC
+#define GPIO_NPCA110P_POWER	GPIO_PC(21)		 /* MPCA110P POWER ON pin */
+#define GPIO_NPCA110P_RESET	GPIO_PC(22)	 /* NPCA110P RESET pin */
+#define GPIO_NPCA110P_SPK_EN -1
+#define GPIO_NPCA110P_SPEAKER_EN_LEVEL   -1
+#endif
+
 /* ****************************GPIO AUDIO END******************************** */
 
 /* ****************************GPIO LCD START****************************** */
@@ -125,6 +134,12 @@
 #define GPIO_I2C1_SDA		-1
 #define GPIO_I2C1_SCK		-1
 #endif
+
+#ifdef CONFIG_SOFT_I2C2_GPIO_V12_JZ
+#define GPIO_I2C2_SDA		-1
+#define GPIO_I2C2_SCK		-1
+#endif
+
 
 #endif /* CONFIG_I2C_GPIO */
 

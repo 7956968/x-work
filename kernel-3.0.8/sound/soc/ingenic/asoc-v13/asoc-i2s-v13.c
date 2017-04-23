@@ -127,137 +127,29 @@ static int jz_i2s_startup(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-struct clk {
-	const char *name;
-	unsigned long rate;
-	struct clk *parent;
-	unsigned long flags;
-	struct clk_ops *ops;
-	int count;
-	struct clk *source;
-};
-
-
-static int calculate_exact_div(unsigned long pll, unsigned long clk, unsigned int div)
+static int jz_i2s_set_rate(struct device *aic ,struct jz_aic* jz_aic, unsigned long sample_rate)
 {
-	/* sysclk = (256 or 128) * sync */
-	unsigned long sysclk = clk * div;
-	unsigned int i2scdr = pll / sysclk;
-
-	if ((pll / i2scdr - sysclk) > (sysclk - pll / (i2scdr + 1)))
-		i2scdr = i2scdr + 1;
-
-	return i2scdr;
-}
-
-static unsigned long calculate_cgu_aic_rate(struct clk *cgu_aic_clk  ,unsigned long *rate)
-{
-	int i;
-	unsigned int div;
-	int err;
-	struct clk *codec_parent = NULL;
-	struct clk *pll_clk = NULL;
-	unsigned long parent_clk;
-
-	unsigned long mrate[13] = {
-		8000, 11025, 12000, 16000,22050,24000,
-		32000,44100, 48000, 88200,96000,192000, 384000,
-	};
-
-	/* sysclk_div = sysclk / sync
-	 * You can change it just follow your board.
-	 * Now 4775 apll set to 948MHZ, mpll set to 492MHZ, sysclk_div[] is calculated refer to it.
-	 * If you change pll clk, you should reset it again.
-	*/
-	unsigned int sysclk_div[13] = {
-		256, 256, 256, 256, 256, 256,
-		256, 256, 256, 256, 256, 256, 256,
-	};
-
-	for (i=0; i<=12; i++) {
-		if (*rate <= mrate[i]) {
-			*rate = mrate[i];
-			div = sysclk_div[i];
-			break;
-		}
-	}
-	if (i > 12) {
-		printk("The rate isnot be support, here fix to 44100 sample rate\n");
-		*rate = 44100; /*unsupport rate use default*/
-		div = 256;
-	}
-
-	codec_parent = clk_get_parent(cgu_aic_clk);
-	if (IS_ERR(codec_parent)) {
-		printk(KERN_ERR"cgu_aic clk_get_parent failed\n");
-	}
-
-	parent_clk = clk_get_rate(codec_parent);
-
-	if (*rate == 44100 || *rate == 88200){
-		if (strcmp(codec_parent->name, "apll")){
-			pll_clk = clk_get(NULL, "apll");
-			if (IS_ERR(pll_clk)) {
-				printk(KERN_ERR"I2s get apll failed\n");
-			}
-			err = clk_set_parent(cgu_aic_clk , pll_clk);
-			if (err < 0){
-				printk(KERN_ERR"I2s clk_set_parent to apll error\n");
-			}else{
-				parent_clk = clk_get_rate(pll_clk);
-			}
-			clk_put(pll_clk);
-		}
-	}else{
-		if (strcmp(codec_parent->name, "mpll")){
-			pll_clk = clk_get(NULL, "mpll");
-			if (IS_ERR(pll_clk)) {
-				printk(KERN_ERR"I2s get mpll failed\n");
-			}
-			err = clk_set_parent(cgu_aic_clk, pll_clk);
-			if (err < 0){
-				printk(KERN_ERR"I2s clk_set_parent to mpll error\n");
-			}else{
-				parent_clk = clk_get_rate(pll_clk);
-			}
-			clk_put(pll_clk);
-		}
-	}
-
-	/* pll / i2scdr = sysclk */
-	div = calculate_exact_div(parent_clk, *rate, div);
-
-	return parent_clk / div;
-}
-
-
-static unsigned long  __i2s_set_sample_rate(struct jz_aic* jz_aic, unsigned long sys_clk, unsigned long sync){
-	unsigned long tmp_val;
-	int div = sys_clk/(64*sync);
-	if ((sys_clk - 64*sync*div) > (64*sync*(div+1) - sys_clk))
-		div = div + 1;
-
-	tmp_val = readl(jz_aic->vaddr_base + I2SDIV);
-	tmp_val &= ~I2SDIV_DV_BIT;
-	writel(tmp_val,jz_aic->vaddr_base + I2SDIV);
-
-	printk("replay sysclk = %d * sync\n", 64 * div);
-	return sys_clk/(64*div);
-}
-
-
-static int jz_i2s_set_rate(struct device *aic ,struct jz_aic* jz_aic, unsigned long sample_rate){
+	int ret;
 	unsigned long sysclk;
-	struct clk* cgu_aic_clk = jz_aic->clk;
+
+	if (jz_aic->clk == NULL)
+		return -1;
 	__i2s_stop_bitclk(aic);
-	sysclk = calculate_cgu_aic_rate(cgu_aic_clk,&sample_rate);
-	clk_set_rate(cgu_aic_clk, sysclk);
-	jz_aic->sysclk = clk_get_rate(cgu_aic_clk);
+
+	sysclk = sample_rate * 256;
+	ret = clk_set_rate(jz_aic->clk, sysclk);
+	if(ret < 0) {
+		printk("ERROR: set i2s rate failed\n");
+		return -EINVAL;
+	}
+	jz_aic->sysclk = clk_get_rate(jz_aic->clk);
 	if (jz_aic->sysclk > sysclk) {
 		printk("external codec set sysclk fail.\n");
 		return -1;
 	}
-	__i2s_set_sample_rate(jz_aic, sysclk, sample_rate);
+	writel(0x3, jz_aic->vaddr_base + I2SDIV);
+	*(volatile unsigned int*)0xb0000070 = 0x0;
+
 	__i2s_start_bitclk(aic);
 	return sample_rate;
 }

@@ -10,6 +10,7 @@
 #include "mozart_ui.h"
 #include "mozart_musicplayer.h"
 #include "modules/mozart_module_cloud_music.h"
+#include "sharememory_interface.h"
 #include "dm6291_led.h"
 #if(SUPPORT_SONG_SUPPLYER == SONG_SUPPLYER_XIMALAYA)
 #include "song_supplyer/ximalaya.h"
@@ -71,15 +72,24 @@ int mozart_module_cloud_music_search_and_play(char *key)
 /* TODO: cache url */
 int mozart_module_cloud_music_startup(void)
 {
+
+	memory_domain domain;
+	int ret;
 //	char buf[1024] = {};
 	int idx = random() % (sizeof(artists) / sizeof(artists[0]));
 
+	ret = share_mem_get_active_domain(&domain);
+	if(ret != 0 || domain != 0)
+		return 0;
 	if (mozart_module_cloud_music_start())
 		return -1;
-	current_play_domain_change(PM_CLOUD);
+	ret = share_mem_get_active_domain(&domain);
 	mozart_play_key("cloud_mode");
 
 	//sprintf(buf, "欢迎回来，为您播放%s的歌", artists[idx]);
+	ret = share_mem_get_active_domain(&domain);
+	if(ret != 0 || domain != 0)
+		return 0;
 	//mozart_tts(buf);
 	//mozart_tts_wait();
 	printf("bbb\n");

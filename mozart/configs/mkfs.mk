@@ -185,6 +185,12 @@ endif # empty
 	if [ x$$$$audio_type == x ];then\
 		echo "**** [Error] $(SUPPORT_AUDIO): NOT supported audio type!!!!" && exit 1;\
 	fi
+#support usb_audio (otg as device)
+ifeq ("$(SUPPORT_USB_AUDIO)", "1")
+	@$(OUTPUT_DIR)/host/usr/bin/inirw -f $(UPDATERFS_DIR)/usr/data/system.ini -w -s usb_audio -k use_usb_audio -v 1
+endif
+
+
 
 # song supplyer
 ## lapsule

@@ -37,6 +37,7 @@
 #include "mozart_musicplayer.h"
 #include "mozart_key_function.h"
 
+#include "mozart_tts.h"
 #ifdef SUPPORT_BT
 #include "modules/mozart_module_bt.h"
 #endif
@@ -67,6 +68,7 @@ event_handler *keyevent_handler = NULL;
 event_handler *miscevent_handler = NULL;
 char *app_name = NULL;
 int tfcard_status = -1;
+//hzb add
 int udisk_status = -1;
 static int null_cnt = 0;
 
@@ -80,11 +82,6 @@ static enum mul_state mulroom_state = MUL_IDLE;
 #define APP_AVK_VOLUME_MAX      17
 int bsa_ble_start_regular_enable = 0;
 int bsa_start_regular_enable = 0;
-int ble_service_create_enable = 0;
-int ble_service_add_char_enable = 0;
-int ble_service_start_enable = 0;
-int ble_client_open_enable = 0;
-int ble_client_write_enable = 0;
 int ble_hh_add_dev_enable = 0;
 int bt_link_state = BT_LINK_DISCONNECTED;
 pthread_t bt_reconnect_pthread;
@@ -95,14 +92,17 @@ int disc_num = -1;
 pthread_mutex_t bt_reconnect_lock;
 static UINT8 avk_volume_set_dsp[APP_AVK_VOLUME_MAX] = {0, 6, 12, 18, 25, 31, 37, 43, 50, 56, 62, 68, 75, 81, 87, 93, 100};
 static UINT8 avk_volume_set_phone[APP_AVK_VOLUME_MAX] = {0, 7, 15, 23, 31, 39, 47, 55, 63, 71, 79, 87, 95, 103, 111, 119, 127};
-#if (SUPPORT_BSA_BLE == 1)
-extern ble_create_service_data ble_heart_rate_service;
-extern ble_add_char_data ble_heart_rate_measure_char;
-extern ble_add_char_data ble_notify_char;
-#endif /* SUPPORT_BSA_BLE */
 
+enum {
+	DG_IDLE,
+	DG_CONNECTED,
+	DG_CONNECT_FAILED,
+	DG_DISCONNECTED,
+};
+int bt_dg_flag = DG_IDLE;
 #if (SUPPORT_BSA_A2DP_SOURCE == 1)
-extern int avk_source_set_audio_output();
+int bt_av_link_state = BT_LINK_DISCONNECTED;
+extern int avk_source_set_audio_output(char *ao_iface);
 #endif /* SUPPORT_BSA_A2DP_SOURCE */
 
 #if (SUPPORT_BSA_PBC == 1)
@@ -264,9 +264,9 @@ int create_wifi_config_pthread(void)
 {
 	pthread_mutex_lock(&wifi_config_lock);
 	// cancle previous thread.
-	if (wifi_configing) {
+	if (wifi_configing)
 		pthread_cancel(wifi_config_pthread);
-	}
+
 	// enter wifi config mode.
 	if (pthread_create(&wifi_config_pthread, NULL, wifi_config_func, NULL) == -1) {
 		printf("Create wifi config pthread failed: %s.\n", strerror(errno));
@@ -670,6 +670,15 @@ void keyevent_callback(mozart_event event, void *param)
 		}
 		printf("[DEBUG] key %s %s!!!\n",
 			   keycode_str[event.event.key.key.code], keyvalue_str[event.event.key.key.value]);
+
+#if (SUPPORT_USB_AUDIO == 1)
+		if(mozart_usb_audio_is_in() == 1){
+			if (event.event.key.key.code != KEY_POWER
+				&& event.event.key.key.code != KEY_VOLUMEUP
+				&& event.event.key.key.code != KEY_VOLUMEDOWN)
+					return;
+		}
+#endif
 		if (input_event_handler(event.event.key.key) == 0)
 			break;
 
@@ -778,6 +787,15 @@ void miscevent_callback(mozart_event event, void *param)
 				mozart_linein_off();
 				lapsule_do_linein_off();
 			}
+		} else if(!strcasecmp(event.event.misc.name, "usb")) {
+#if (SUPPORT_USB_AUDIO == 1)
+		} else if(!strcasecmp(event.event.misc.name, "uaudio")) {
+			if (!strcasecmp(event.event.misc.type, "connected")) {
+				mozart_usb_audio_plug_in();
+			}else if(!strcasecmp(event.event.misc.type,"disconnected")){
+				mozart_usb_audio_plug_out();
+			}
+#endif
 		} else if (!strcasecmp(event.event.misc.name, "udisk")) {
 			if (!strcasecmp(event.event.misc.type, "plugin")) { // plugin
 				if (udisk_status != 1) {
@@ -897,6 +915,7 @@ void miscevent_callback(mozart_event event, void *param)
 #endif
 				}
 			} else if (!strcasecmp(event.event.misc.type, "disconnected")) {
+				bluetooth_cancel_ring_pthread();
 				if (mozart_bluetooth_get_link_status() == BT_LINK_DISCONNECTED) {
 					if (bt_link_state == BT_LINK_CONNECTED) {
 						bt_link_state = BT_LINK_DISCONNECTED;
@@ -1065,13 +1084,80 @@ void miscevent_callback(mozart_event event, void *param)
 				printf("unhandle bt music event: %s.\n", event.event.misc.type);
 			}
 		} else if (!strcasecmp(event.event.misc.name, "bt_av")) {
-			if (!strcasecmp(event.event.misc.type, "connected")) {
+			if (!strcasecmp(event.event.misc.type, "open")) {
+				/* open successful */
+				if (event.event.misc.value[0] == 0) {
 #if (SUPPORT_BSA_A2DP_SOURCE == 1)
-				avk_source_set_audio_output();
+					bt_av_link_state = BT_LINK_CONNECTED;
+					char *ao_iface = "stream:sockfile=/var/run/bt-av-stream.socket";
+					avk_source_set_audio_output(ao_iface);
 #endif
+				/* open failed */
+				} else {
+#if (SUPPORT_BSA_A2DP_SOURCE == 1)
+					bt_av_link_state = BT_LINK_CONNECT_FAILED;
+#endif
+					printf("AV open failed!\n");
+				}
 			} else if (!strcasecmp(event.event.misc.type, "disconnected")) {
+#if (SUPPORT_BSA_A2DP_SOURCE == 1)
+				bt_av_link_state = BT_LINK_DISCONNECTED;
+				char *ao_iface = "oss:/dev/dsp";
+				avk_source_set_audio_output(ao_iface);
+#endif
 			} else if (!strcasecmp(event.event.misc.type, "play")) {
 			} else if (!strcasecmp(event.event.misc.type, "pause")) {
+			/* REMOTE_CMD_EVT */
+			} else if (!strcasecmp(event.event.misc.type, "RC")) {
+				int av_cur_play_state;
+				switch(event.event.misc.value[0]) {
+					case BSA_AV_RC_PLAY:
+						printf("AV RC Play!\n");
+						av_cur_play_state = mozart_bluetooth_av_get_play_state();
+						switch (av_cur_play_state) {
+							case APP_AV_PLAY_PAUSED:
+								mozart_bluetooth_av_resume_play();
+								break;
+							case APP_AV_PLAY_STOPPED:
+								break;
+							case APP_AV_PLAY_STARTED:
+								/* Already started */
+								break;
+							case APP_AV_PLAY_STOPPING:
+								/* Stop in progress */
+								break;
+							default:
+								printf("Unsupported play state (%d)\n", av_cur_play_state);
+								break;
+
+						}
+						break;
+					case BSA_AV_RC_STOP:
+						printf("AV RC Stop!\n");
+						mozart_bluetooth_av_stop_play();
+						break;
+					case BSA_AV_RC_PAUSE:
+						printf("AV RC Pause!\n");
+						mozart_bluetooth_av_pause_play();
+						break;
+					case BSA_AV_RC_FORWARD:
+						printf("AV RC Forward!\n");
+						break;
+					case BSA_AV_RC_BACKWARD:
+						printf("AV RC Backward!\n");
+						break;
+					case BSA_AV_RC_VOL_UP:
+						printf("AV RC VOl_UP!\n");
+						break;
+					case BSA_AV_RC_VOL_DOWN:
+						printf("AV RC VOl_DOWN!\n");
+						break;
+					default:
+						printf("key: 0x%x", event.event.misc.value[0]);
+						break;
+				}
+			} else if (!strcasecmp(event.event.misc.type, "rc_open")) {
+			} else if (!strcasecmp(event.event.misc.type, "rc_close")) {
 			} else {
 				printf("unhandle bt music event: %s.\n", event.event.misc.type);
 			}
@@ -1127,59 +1213,6 @@ void miscevent_callback(mozart_event event, void *param)
 					}
 				}
 #endif
-			} else if (!strcasecmp(event.event.misc.type, "se_open")) {
-				printf("se_open!\n");
-			} else if (!strcasecmp(event.event.misc.type, "se_close")) {
-				printf("se_close!\n");
-			} else if (!strcasecmp(event.event.misc.type, "se_create")) {
-				ble_service_create_enable = 1;
-			} else if (!strcasecmp(event.event.misc.type, "se_addchar")) {
-				ble_service_add_char_enable = 1;
-			} else if (!strcasecmp(event.event.misc.type, "se_start")) {
-				ble_service_start_enable = 1;
-			} else if (!strcasecmp(event.event.misc.type, "se_r_complete")) {
-			} else if (!strcasecmp(event.event.misc.type, "se_w_complete")) {
-#if (SUPPORT_BSA_BLE == 1)
-				int i = 0;
-				int value_num = 0;
-				int server_num = 0;
-				int char_attr_num = 0;
-				int length_of_data = 3;
-				UINT8 value[BSA_BLE_MAX_ATTR_LEN];
-				ble_server_indication ble_indication;
-
-				server_num = ble_heart_rate_service.server_num;
-				char_attr_num = ble_notify_char.char_attr_num;
-				value_num = mozart_bluetooth_server_get_char_value(server_num, char_attr_num, value);
-				printf("value_num = %d\n", value_num);
-				for (i = 0; i < value_num; i++)
-					printf("value[%d] = 0x%x\n", i, value[i]);
-				/* Listen for notify */
-				if (value[0] == 1) {
-					ble_indication.server_num = server_num;
-					ble_indication.attr_num = ble_heart_rate_measure_char.char_attr_num;
-					ble_indication.length_of_data = length_of_data;
-					server_num = ble_heart_rate_service.server_num;
-					char_attr_num = ble_heart_rate_measure_char.char_attr_num;
-					/* get and set client vaule */
-					value_num = mozart_bluetooth_server_get_char_value(server_num, char_attr_num, value);
-					printf("value_num1 = %d\n", value_num);
-					for (i = 0; i < value_num; i++)
-						printf("value1 = 0x%x\n", value[i]);
-					value[0] = 0x12;
-					value[1] = 0x13;
-					value[2] = 0x14;
-					mozart_bluetooth_server_set_char_value(server_num, char_attr_num, value, 3);
-					/* send client indication */
-					mozart_bluetooth_ble_server_send_indication(&ble_indication);
-				}
-#endif /* SUPPORT_BSA_BLE */
-			} else if (!strcasecmp(event.event.misc.type, "cl_open")) {
-				ble_client_open_enable = 1;
-			} else if (!strcasecmp(event.event.misc.type, "cl_write")) {
-				ble_client_write_enable = 1;
-			} else if (!strcasecmp(event.event.misc.type, "cl_close")) {
-				printf("cl_close!\n");
 			} else {
 				printf("unhandle bt ble event: %s.\n", event.event.misc.type);
 			}
@@ -1220,10 +1253,14 @@ void miscevent_callback(mozart_event event, void *param)
 
 			}
 		} else if (!strcasecmp(event.event.misc.name, "bt_dg")) {
-			if (!strcasecmp(event.event.misc.type, "connected")) {
-				bt_link_state = BT_LINK_CONNECTED;
+			if (!strcasecmp(event.event.misc.type, "open")) {
+				printf("state: %d\n", event.event.misc.value[0]);
+				if (event.event.misc.value[0] == 0)
+					bt_dg_flag = DG_CONNECTED;
+				else if (event.event.misc.value[0] == 1)
+					bt_dg_flag = DG_CONNECT_FAILED;
 			} else if (!strcasecmp(event.event.misc.type, "disconnected")) {
-				bt_link_state = BT_LINK_DISCONNECTED;
+				bt_dg_flag = DG_DISCONNECTED;
 			} else if (!strcasecmp(event.event.misc.type, "find_service")) {
 			}
 		/* phone book client */
@@ -1312,10 +1349,10 @@ void miscevent_callback(mozart_event event, void *param)
 		} else if (!strcasecmp(event.event.misc.name, "multiroom")) {
 			if (!strcasecmp(event.event.misc.type, "group_dist")) {
 				printf("group dist event\n");
-				mozart_mulroom_audio_change(MR_AO_DISTRIBUTOR);
+				module_mulroom_audio_change(MR_AO_DISTRIBUTOR);
 			} else if (!strcasecmp(event.event.misc.type, "dismiss_dist")) {
 				printf("dismiss dist event\n");
-				mozart_mulroom_audio_change(MR_AO_NORMAL);
+				module_mulroom_audio_change(MR_AO_NORMAL);
 			} else if (!strcasecmp(event.event.misc.type, "group_recv")) {
 				printf("group recv event\n");
 				mozart_module_stop();
@@ -1360,7 +1397,7 @@ void miscevent_callback(mozart_event event, void *param)
 static void *sync_time_func(void *arg)
 {
 #if (SUPPORT_MULROOM == 1)
-	mozart_mulroom_run_ntpd();
+	module_mulroom_run_ntpd();
 #else
 	mozart_system("ntpd -nq");
 #endif
@@ -1420,9 +1457,12 @@ int network_callback(const char *p)
 			if(tmp != NULL){
 				strncpy(test, json_object_get_string(tmp), strlen(json_object_get_string(tmp)));
 				printf("STA_CONNECT_FAILED REASON:%s\n", json_object_get_string(tmp));
+				if (strcmp("WRONG_KEY", json_object_get_string(tmp)) == 0) {
+					mozart_play_key("wifi_link_wrongkey");		
+				}
 			}
 			{
-				mozart_ui_net_connect_failed();
+				mozart_ui_net_connect_failed();		
 				mozart_play_key("wifi_link_failed");
 #if 1	//DM6291_FIX	
 	            new_mode.cmd = SW_AP;
@@ -1494,7 +1534,7 @@ int network_callback(const char *p)
 				printf("ERROR: [%s] Request Network Failed, Please Register First!!!!\n", app_name);
 		} else if (!strncmp(network_event.content, network_configure_status_str[AIRKISS_SUCCESS], strlen(network_configure_status_str[AIRKISS_SUCCESS]))) {
 			mozart_ui_net_config_success();
-			mozart_play_key("airkiss_config_success");
+			//mozart_play_key("airkiss_config_success");
 //DAMAI add
 #if 1
             system("sync");//JJJHHH----ave wifi configure
@@ -1545,13 +1585,19 @@ int network_callback(const char *p)
 			mozart_led_turn_off(LED_RECORD);
 			mozart_led_turn_slow_flash(LED_WIFI);
 			mozart_play_key("wifi_ap_mode");
-			startall(1);
-			//a little bad, fix it.
-			if (in_depend_network_playmode() || mozart_module_get_play_status() == mozart_module_status_stop)
-				set_switch_souce_snd();
-			else
-				if (mozart_module_get_play_status() == mozart_module_status_pause)
-				mozart_play_pause();
+
+#if (SUPPORT_USB_AUDIO == 1)
+			if(mozart_usb_audio_is_in() == 0)
+#endif		
+			{
+				startall(1);
+				//a little bad, fix it.
+				if (in_depend_network_playmode() || mozart_module_get_play_status() == mozart_module_status_stop)
+					set_switch_souce_snd();
+				else
+					if (mozart_module_get_play_status() == mozart_module_status_pause)
+						mozart_play_pause();
+			}
 		} else if (infor.wifi_mode == STA) {
 			mozart_ui_net_connected();
 			null_cnt = 0;
@@ -1578,12 +1624,17 @@ int network_callback(const char *p)
 				mozart_mulroom_restore_mode();
 			}
 #else
-			startall(1);
-			if (in_depend_network_playmode() || mozart_module_get_play_status() == mozart_module_status_stop)
-				set_switch_souce_snd();
-			else
-				if (mozart_module_get_play_status() == mozart_module_status_pause)
-				mozart_play_pause();
+#if (SUPPORT_USB_AUDIO == 1)
+			if(mozart_usb_audio_is_in() == 0)
+#endif
+			{
+				startall(1);
+				if (in_depend_network_playmode() || mozart_module_get_play_status() == mozart_module_status_stop)
+					set_switch_souce_snd();
+				else
+					if (mozart_module_get_play_status() == mozart_module_status_pause)
+						mozart_play_pause();
+			}
 #endif /* SUPPORT_MULROOM == 1 */
 		} else if (infor.wifi_mode == WIFI_NULL) {
 			null_cnt++;
@@ -1741,7 +1792,7 @@ void *mozart_updater_check_version(void *arg)
 int main(int argc, char **argv)
 {
 	int daemonize = 0;
-	printf("mozart 4\n");
+	printf("mozart 5\n");
 	app_name = argv[0];
 	wifi_ctl_msg_t new_mode;
 	struct wifi_client_register wifi_info;
@@ -1779,6 +1830,7 @@ int main(int argc, char **argv)
 	}
 	dump_compile_info();
 
+
 #if (SUPPORT_MULROOM == 1)
 	mulroom_state = mozart_mulroom_check_saved_mode(MULROOM_INFO_PATH);
 #endif /* SUPPORT_MULROOM == 1 */
@@ -1803,7 +1855,10 @@ int main(int argc, char **argv)
 		startall(0);
 #else
 	// start modules do not depend network.
-	startall(0);
+#if (SUPPORT_USB_AUDIO == 1)
+	if(mozart_usb_audio_is_in() == 0)
+#endif
+		startall(0);
 #endif /* SUPPORT_MULROOM == 1 */
 
 	register_battery_capacity();
@@ -1854,6 +1909,11 @@ int main(int argc, char **argv)
 		mozart_linein_on();
 	}
 #endif /* SUPPORT_MULROOM == 1 */
+
+#if (SUPPORT_USB_AUDIO == 1)
+	if(mozart_usb_audio_is_in() == 1)
+		mozart_usb_audio_plug_in();
+#endif
 
 	if (pthread_create(&updater_chkver_pthread, NULL, mozart_updater_check_version, NULL) == -1)
 		printf("Create updater check version pthread failed: %s.\n", strerror(errno));

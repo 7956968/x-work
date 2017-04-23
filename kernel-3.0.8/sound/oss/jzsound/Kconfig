@@ -152,6 +152,14 @@ if JZ_EXTERNAL_CODEC_V13 #external codec
         bool "tas5010 external codec"
         help
                 Say "Y" to enable tas5010 external codec
+	config NPCA110P_EXTERNAL_CODEC
+		bool "npca110p external codec"
+		help
+				Say "Y" to enable npca110p external codec
+	config ES8374_EXTERNAL_CODEC
+		bool "es8374 external codec"
+		help
+				Say "Y" to enable es8374 external codec
 		
 	config AK4425_4104_EXTERNAL_CODEC
         bool "AK4425A and AK4104-spdif external codec"

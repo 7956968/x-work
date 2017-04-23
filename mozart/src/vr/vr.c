@@ -39,6 +39,11 @@ static vr_target_t vr_next = VR_TO_NULL;
 static vr_info_t *info = NULL;
 
 /**
+ * @brief fast aec wakeup mode. It's possible that asr don't startup when user taking!!!
+ */
+static bool fast_aec_wakeup_mode;
+
+/**
  * @brief state machine logic
  *
  * @param params NULL
@@ -60,8 +65,19 @@ static void *vr_logic_func(void *params)
 				break;
 			case VR_TO_ASR:
 				vr_status = VR_ASR;
-				mozart_asr_start();
+				mozart_asr_start(false);
 				break;
+			case VR_TO_ASR_SDS:
+				vr_status = VR_ASR;
+				mozart_asr_start(true);
+				break;
+			case VR_TO_WAIT:
+				if (vr_working_flag) {
+					usleep(5 * 1000);
+					continue;
+				} else {
+					break;
+				}
 			default:
 				printf("Unsupport vr_target: %d.\n", vr_next);
 				break;
@@ -97,7 +113,7 @@ static void *vr_logic_func(void *params)
 						vr_next = VR_TO_AEC;
 					}
 				}
-			} else if (info->from == VR_FROM_AEC) {
+			} else if (info->from == VR_FROM_AEC && !fast_aec_wakeup_mode) {
 				/* TODO: error handle */
 
 				if (callback_to_mozart) {
@@ -120,8 +136,19 @@ static void *vr_logic_func(void *params)
 static int callback_from_vr(vr_info_t *vr_info)
 {
 	if (vr_info->from == VR_FROM_AEC) {
-		mozart_aec_stop();
+		if (fast_aec_wakeup_mode) {
+			vr_result_t res;
+
+			if (callback_to_mozart) {
+				res = callback_to_mozart(vr_info);
+				vr_next = res.vr_next;
+			} else {
+				/* default next action: AEC */
+				vr_next = VR_TO_AEC;
+			}
+		}
 		info = vr_info;
+		mozart_aec_stop();
 	} else if (vr_info->from == VR_FROM_ASR) {
 		if (vr_info->asr.state == ASR_SPEAK_END)
 			mozart_asr_stop(0);
@@ -138,6 +165,11 @@ static int callback_from_vr(vr_info_t *vr_info)
 	}
 
 	return 0;
+}
+
+void mozart_vr_set_fast_aec_wakeup_mode(bool fast)
+{
+	fast_aec_wakeup_mode = fast;
 }
 
 int mozart_vr_init(mozart_vr_callback callback)
@@ -187,6 +219,29 @@ int mozart_vr_start(void)
 	vr_next = VR_TO_AEC;
 
 	return 0;
+}
+
+int mozart_vr_enter_aec(void)
+{
+	if (vr_next == VR_TO_WAIT) {
+		vr_next = VR_TO_AEC;
+		return 0;
+	} else {
+		return -1;
+	}
+}
+
+int mozart_vr_enter_asr(bool sds)
+{
+	if (vr_next == VR_TO_WAIT) {
+		if (sds)
+			vr_next = VR_TO_ASR_SDS;
+		else
+			vr_next = VR_TO_ASR;
+		return 0;
+	} else {
+		return -1;
+	}
 }
 
 int mozart_vr_stop(void)

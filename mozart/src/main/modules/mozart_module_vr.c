@@ -181,6 +181,8 @@ static vr_result_t process_vr_asr_callback(asr_info_t *asr)
 				/* play tts */
 				sprintf(tips, "%s,%s", asr->sds.music.data[index].artist, asr->sds.music.data[index].title);
 				mozart_tts_sync(tips);
+				//hzb add
+				//必须先startup，因为在后面是指播放时会先判断是否处于cloud模式
 				mozart_module_cloud_music_startup2();
 
 				speech_cloudmusic_playmusic(&asr->sds.music, index);
@@ -275,7 +277,7 @@ static vr_result_t process_vr_asr_callback(asr_info_t *asr)
 
 	if (asr->sds.state == SDS_STATE_OFFERNONE ||
 		asr->sds.state == SDS_STATE_INTERACT) {
-		result.vr_next = VR_TO_ASR;
+		result.vr_next = VR_TO_ASR_SDS;
 		mozart_play_key_sync("asr_continue");
 	} else {
 		if (need_resume_after_asr) {

@@ -242,6 +242,20 @@ mozart_prepare:
 	@echo "#define LEDTYPE_COMMON 1" >> $(MOZART_DIR)/usr/include/mozart_config.h
 	@echo "#define LEDTYPE_BREATH 2" >> $(MOZART_DIR)/usr/include/mozart_config.h
 
+# Main app define.
+main_app_tv_audio:
+	@echo "MAIN_APP=tv_audio" >> $(TOPDIR)/configs/config.mk
+	@echo "" >> $(TOPDIR)/configs/config.mk
+
+# tv_audio mode define
+tv_audio_planet_mode:
+	@echo "SUPPORT_MODE=planet" >> $(TOPDIR)/configs/config.mk
+	@echo "" >> $(TOPDIR)/configs/config.mk
+tv_audio_moon_mode:
+	@echo "SUPPORT_MODE=moon" >> $(TOPDIR)/configs/config.mk
+	@echo "" >> $(TOPDIR)/configs/config.mk
+
+
 # wifi module config (SUPPORT_WIFI_MODULE=xxx) in config.mak
 #   rtk_<module name>: use realtek's wifi module
 #   bcm_<module name>: use broadcom's wifi module
@@ -783,6 +797,12 @@ audio_dev_x1000_config:
 	@echo "AUDIO_DEV_SPDIFOUT=/dev/dsp2" >> $(TOPDIR)/configs/config.mk
 	@echo "" >> $(TOPDIR)/configs/config.mk
 
+usb_audio_enable_config:
+	@echo "SUPPORT_USB_AUDIO=1" >> $(TOPDIR)/configs/config.mk
+	@echo "" >> $(TOPDIR)/configs/config.mk
+	@echo "#define SUPPORT_USB_AUDIO 1" >> $(MOZART_DIR)/usr/include/mozart_config.h
+	@echo "" >> $(MOZART_DIR)/usr/include/mozart_config.h
+
 # flash info define.
 #  spi nor we used now:
 #      gd25q128c: 16MB
@@ -865,6 +885,33 @@ canna_v1.0_ap6255_cramfs_config: unconfig mozart_prepare product_canna_v1.0_ap62
 		wifi_ap6255_config bt_ap6255_config bt_hci_dev_ttyS0_config webrtc_aec_enable_config \
 		audio_dev_x1000_config dmr_enable_config multiroom_enable_config \
 		airplay_enable_config localplayer_enable_config \
+		ingenicplayer_enable_config adb_enable_config \
+		rootfs_cramfs_config usrdata_jffs2_config flash_spi_gd25q128c_config
+	@echo "Config complete sdk with cramfs for canna v1.0 ap6255 board"
+
+canna_v1.0_ap6255_cramfs_multiroom_config: unconfig mozart_prepare product_canna_v1.0_ap6255_config \
+		wifi_ap6255_config bt_disable_config \
+		webrtc_aec_enable_config audio_dev_x1000_config \
+		dmr_enable_config dms_disable_config multiroom_enable_config \
+		airplay_enable_config localplayer_enable_config \
+		ingenicplayer_enable_config adb_enable_config \
+		rootfs_cramfs_config usrdata_jffs2_config flash_spi_gd25q128c_config
+	@echo "Config complete sdk with cramfs multiroom for canna v1.0 ap6255 board"
+
+canna_v1.0_ap6255_cramfs_tv_audio_planet_config: unconfig mozart_prepare product_canna_v1.0_ap6255_config \
+		main_app_tv_audio tv_audio_planet_mode \
+		wifi_ap6255_config bt_disable_config \
+		audio_dev_x1000_config \
+		multiroom_enable_config localplayer_enable_config \
+		ingenicplayer_enable_config adb_enable_config \
+		rootfs_cramfs_config usrdata_jffs2_config flash_spi_gd25q128c_config
+	@echo "Config complete sdk with cramfs for canna v1.0 ap6255 board"
+
+canna_v1.0_ap6255_cramfs_tv_audio_moon_config: unconfig mozart_prepare product_canna_v1.0_ap6255_config \
+		main_app_tv_audio tv_audio_moon_mode \
+		wifi_ap6255_config bt_disable_config \
+		audio_dev_x1000_config \
+		multiroom_enable_config localplayer_enable_config \
 		ingenicplayer_enable_config adb_enable_config \
 		rootfs_cramfs_config usrdata_jffs2_config flash_spi_gd25q128c_config
 	@echo "Config complete sdk with cramfs for canna v1.0 ap6255 board"
@@ -996,8 +1043,6 @@ clean: $(TARGETS_CLEAN)
 distclean: $(TARGETS_DISTCLEAN) clean
 	-rm -rf $(MOZART_DIR) $(MOZART_UPDATER_DIR) $(OUTPUT_DIR)/host
 	-rm -rf $(NODE_MODULES) $(GIT_HOOK_SCRIPT_DIR) $(GIT_HOOK_COMMIT_MSG)
-#HZB add
-#	$(TOPDIR)/device/common/ota/modify_ota_website.sh "not-specified" $(TOPDIR)/device/common/ota/ota.ini
 
 show-targets:
 	@echo "TOPDIR is $(TOPDIR)"

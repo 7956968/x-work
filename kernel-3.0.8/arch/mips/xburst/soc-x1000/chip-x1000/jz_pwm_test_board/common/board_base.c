@@ -152,6 +152,9 @@ static struct jz_platform_device platform_devices_array[] __initdata = {
 #ifdef CONFIG_TAS5010_EXTERNAL_CODEC
 	DEF_DEVICE(&tas5010_device, &tas5010_codec_data, sizeof(struct snd_codec_data)),
 #endif
+#ifdef CONFIG_ES8374_EXTERNAL_CODEC
+	DEF_DEVICE(&es8374_device,&es8374_codec_data,sizeof(struct snd_codec_data)),
+#endif
 
 #ifdef CONFIG_XBURST_DMAC_V13
 	DEF_DEVICE(&jz_pdma_device, 0, 0),

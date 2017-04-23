@@ -26,21 +26,23 @@
 #include <linux/gpio.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
-#include <linux/ethtool.h>
 #include <linux/skbuff.h>
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
 #include <linux/interrupt.h>
-#include <soc/gpio.h>
-#include <soc/irq.h>
 #include <linux/clk.h>
-#include <soc/cpm.h>
-#include <soc/base.h>
+#include <linux/ethtool.h>
 
+#include <soc/base.h>
+#include <soc/cpm.h>
+#include <soc/irq.h>
+#include <soc/gpio.h>
+
+#include <mach/jzeth_phy.h>
+
+#include "ethtool.h"
 #include "jz_mac.h"
 
-#define IOCTL_DUMP_REGISTER  SIOCDEVPRIVATE+1
-#define IOCTL_DUMP_DESC      SIOCDEVPRIVATE+2
 #ifndef IRQ_ETH
 #define IRQ_ETH		IRQ_GMAC
 #endif
@@ -74,11 +76,6 @@ typedef enum {
 	/* MAC PHY Soft reset */
 	MAC_SREST,
 } mac_clock_control;
-
-/* MDC  = 2.5 MHz */
-#ifndef JZMAC_MDC_CLK
-#define JZMAC_MDC_CLK 2500000
-#endif
 
 #define COPYBREAK_DEFAULT 256
 static unsigned int copybreak __read_mostly = COPYBREAK_DEFAULT;
@@ -118,34 +115,9 @@ MODULE_PARM_DESC(copybreak,
 static int jz_mdio_phy_read(struct net_device *dev, int phy_id, int location);
 static void jz_mdio_phy_write(struct net_device *dev, int phy_id, int location, int val);
 
-struct clk *clk_gate, *clk_cgu;
-#ifdef CONFIG_JZGPIO_PHY_RESET
-struct jz_gpio_phy_reset *gpio_phy_reset;
-static int jzmac_phy_reset(void)
-{
-#ifdef CONFIG_JZ_GPIO_SAVE
-	int error;
-	jz_gpio_save_reset_func(gpio_phy_reset->crtl_port, gpio_phy_reset->set_func,
-				gpio_phy_reset->crtl_pins, &(gpio_phy_reset->func));
-	error = gpio_request(gpio_phy_reset->gpio, "jzmac");
-	if (error < 0) {
-		printk("failed to request GPIO %d, error %d\n",
-		       gpio_phy_reset->gpio, error);
-		return error;
-	}
-	gpio_direction_output(gpio_phy_reset->gpio, !gpio_phy_reset->active_level);
-	mdelay(gpio_phy_reset->delaytime_msec);
-	gpio_direction_output(gpio_phy_reset->gpio, gpio_phy_reset->active_level);
-	gpio_free(gpio_phy_reset->gpio);
-	jz_gpio_restore_func(gpio_phy_reset->crtl_port, gpio_phy_reset->crtl_pins,
-			     &(gpio_phy_reset->func));
-#else
-	jzgpio_phy_reset(gpio_phy_reset);
-#endif
+static struct clk *mac_clk;
+static struct clk *phy_clk;
 
-	return 0;
-}
-#endif
 static inline unsigned char str2hexnum(unsigned char c)
 {
 	if (c >= '0' && c <= '9')
@@ -390,6 +362,8 @@ __attribute__((__unused__)) static void jzmac_phy_dump(struct jz_mac_local *lp) 
 	for (i = 0; i < sizeof(phy) / sizeof(u16); i++)
 		data[i] = lp->mii_bus->read(lp->mii_bus, lp->phydev->addr, phy[i]);
 
+	dev_info(&lp->pdev->dev, "PHY ID: %08X\n", lp->phydev->addr);
+	dev_info(&lp->pdev->dev, "PHY Identifier: %08X\n", lp->phydev->phy_id);
 	for (i = 0; i < sizeof(phy) / sizeof(u16); i++)
 		printk("PHY reg%d, value %04X\n", phy[i], data[i]);
 }
@@ -494,7 +468,8 @@ static int desc_list_init_rx(struct jz_mac_local *lp) {
 	size = lp->rx_ring.count * sizeof(struct jzmac_buffer);
 	lp->rx_ring.buffer_info = vmalloc(size);
 	if (!lp->rx_ring.buffer_info) {
-		printk(KERN_ERR "Unable to allocate memory for the receive descriptor ring\n");
+		dev_err(&lp->pdev->dev,
+				"Unable to allocate memory for the receive descriptor ring\n");
 		return -ENOMEM;
 	}
 	memset(lp->rx_ring.buffer_info, 0, size);
@@ -556,6 +531,7 @@ static void desc_list_free_rx(struct jz_mac_local *lp) {
 			}
 		}
 	}
+
 	vfree(lp->rx_ring.buffer_info);
 	lp->rx_ring.buffer_info = NULL;
 	lp->rx_ring.next_to_use = lp->rx_ring.next_to_clean = 0;
@@ -606,7 +582,8 @@ static int desc_list_init_tx(struct jz_mac_local *lp) {
 	size = lp->tx_ring.count * sizeof(struct jzmac_buffer);
 	lp->tx_ring.buffer_info = vmalloc(size);
 	if (!lp->tx_ring.buffer_info) {
-		printk(KERN_ERR"Unable to allocate memory for the receive descriptor ring\n");
+		dev_err(&lp->pdev->dev,
+				"Unable to allocate memory for the receive descriptor ring\n");
 		return -ENOMEM;
 	}
 	memset(lp->tx_ring.buffer_info, 0, size);
@@ -685,7 +662,7 @@ static void desc_list_free_tx(struct jz_mac_local *lp) {
 		b = lp->tx_ring.buffer_info;
 
 		for (i = 0; i < JZMAC_TX_DESC_COUNT; i++) {
-			// panic("===>ahha, testing! please do not goes here(%s:%d)!!!\n", __func__, __LINE__);
+			//panic("===>ahha, testing! please do not goes here(%s:%d)!!!\n", __func__, __LINE__);
 			jzmac_unmap_and_free_tx_resource(lp, b + i);
 		}
 
@@ -759,7 +736,7 @@ static int desc_list_init(struct jz_mac_local *lp)
 
 init_error:
 	desc_list_free(lp);
-	printk(KERN_ERR JZMAC_DRV_NAME ": kmalloc failed\n");
+	dev_err(&lp->pdev->dev, "descriptor list init failed\n");
 	return -ENOMEM;
 }
 
@@ -772,8 +749,10 @@ static void jz_mac_adjust_link(struct net_device *dev)
 	unsigned long flags;
 	int new_state = 0;
 
-	//printk("===>ajust link, old_duplex = %d, old_speed = %d, old_link = %d\n",
-	//       lp->old_duplex, lp->old_speed, lp->old_link);
+#if 0
+	dev_dbg(&dev->dev, "ajust link, old_duplex = %d, old_speed = %d, old_link = %d\n",
+	       lp->old_duplex, lp->old_speed, lp->old_link);
+#endif
 
 	spin_lock_irqsave(&lp->link_lock, flags);
 	if (phydev->link) {
@@ -797,18 +776,18 @@ static void jz_mac_adjust_link(struct net_device *dev)
 
 		if (phydev->speed != lp->old_speed) {
 			switch (phydev->speed) {
-				case 1000:
-					synopGMAC_select_speed1000(gmacdev);
-					break;
-				case 100:
-					synopGMAC_select_speed100(gmacdev);
-					break;
-				case 10:
-					synopGMAC_select_speed10(gmacdev);
-					break;
-				default:
-					printk(KERN_ERR "GMAC PHY speed NOT match!\n");
-					synopGMAC_select_speed100(gmacdev);
+			case 1000:
+				synopGMAC_select_speed1000(gmacdev);
+				break;
+			case 100:
+				synopGMAC_select_speed100(gmacdev);
+				break;
+			case 10:
+				synopGMAC_select_speed10(gmacdev);
+				break;
+			default:
+				dev_err(&dev->dev, "GMAC PHY speed NOT match!\n");
+				synopGMAC_select_speed100(gmacdev);
 			}
 
 			new_state = 1;
@@ -832,8 +811,10 @@ static void jz_mac_adjust_link(struct net_device *dev)
 	if (new_state)
 		phy_print_status(phydev);
 
-	//printk("===>ajust link, new_duplex = %d, new_speed = %d, new_link = %d\n",
-	//       lp->old_duplex, lp->old_speed, lp->old_link);
+#if 0
+	dev_dbg(&dev->dev, "ajust link, new_duplex = %d, new_speed = %d, new_link = %d\n",
+			lp->old_duplex, lp->old_speed, lp->old_link);
+#endif
 
 	spin_unlock_irqrestore(&lp->link_lock, flags);
 
@@ -843,7 +824,6 @@ static int mii_probe(struct net_device *dev)
 {
 	struct jz_mac_local *lp = netdev_priv(dev);
 	struct phy_device *phydev = NULL;
-	//int clkdiv[8] = { 4, 4, 6, 8, 10, 14, 20, 28 };
 	int i;
 
 	/* search for connect PHY device */
@@ -859,8 +839,7 @@ static int mii_probe(struct net_device *dev)
 
 	/* now we are supposed to have a proper phydev, to attach to... */
 	if (!phydev) {
-		printk(KERN_INFO "%s: Don't found any phy device at all\n",
-				dev->name);
+		dev_info(&dev->dev, "Don't found any phy device at all\n");
 		return -ENODEV;
 	}
 
@@ -879,7 +858,7 @@ static int mii_probe(struct net_device *dev)
 #endif
 
 	if (IS_ERR(phydev)) {
-		printk(KERN_ERR "%s: Could not attach to PHY\n", dev->name);
+		dev_err(&dev->dev, "Could not attach to PHY\n");
 		return PTR_ERR(phydev);
 	}
 
@@ -984,7 +963,6 @@ void jzmac_update_stats(struct jz_mac_local *lp)
  **/
 static void jzmac_watchdog(unsigned long data) {
 	struct jz_mac_local *lp = (struct jz_mac_local *)data;
-	//struct net_device *netdev = lp->netdev;
 
 	jzmac_update_stats(lp);
 
@@ -1074,7 +1052,6 @@ static int jzmac_tx_map(struct jz_mac_local *lp,
 	for (f = 0; f < nr_frags; f++) {
 		struct skb_frag_struct *frag;
 
-		//struct page *p;
 		frag = &skb_shinfo(skb)->frags[f];
 		len = frag->size;
 		offset = frag->page_offset;
@@ -1089,8 +1066,8 @@ static int jzmac_tx_map(struct jz_mac_local *lp,
 				offset,
 				len,
 				DMA_TO_DEVICE);
-
 		buffer_info->mapped_as_page = true;
+
 		if (dma_mapping_error(&pdev->dev, buffer_info->dma))
 			goto dma_unwind;
 		segs = skb_shinfo(skb)->gso_segs ? : 1;
@@ -1101,8 +1078,8 @@ static int jzmac_tx_map(struct jz_mac_local *lp,
 		count++;
 	}
 
-
 	return count;
+
 dma_unwind:
 	dev_err(&pdev->dev, "Tx DMA map failed at dma_unwind\n");
 	while(count-- > 0) {
@@ -1162,11 +1139,11 @@ static void jzmac_tx_queue(struct jz_mac_local *lp,
 	tx_desc = JZMAC_TX_DESC(*tx_ring, i);
 
 	tx_desc->length |= (((cpu_to_le32(buffer_info->length) <<DescSize1Shift) & DescSize1Mask)
-			| ((0 <<DescSize2Shift) & DescSize2Mask));  // buffer2 is not used
+			| ((0 <<DescSize2Shift) & DescSize2Mask)); /* buffer2 is not used */
 	tx_desc->buffer1 = cpu_to_le32(buffer_info->dma);
 	tx_desc->buffer2 = 0;
-	tx_desc->status |=  (DescTxFirst | DescTxLast | DescTxIntEnable); //ENH_DESC
-	tx_desc->status |= DescOwnByDma;//ENH_DESC
+	tx_desc->status |= (DescTxFirst | DescTxLast | DescTxIntEnable); /* ENH_DESC */
+	tx_desc->status |= DescOwnByDma; /* ENH_DESC */
 
 	wmb();
 
@@ -1268,7 +1245,7 @@ static bool jzmac_clean_tx_irq(struct jz_mac_local *lp) {
 	}
 
 	tx_ring->next_to_clean = i;
-	//printk("===>tx: %d pkts cleaned\n", count);
+	//dev_dbg(&netdev->dev, "tx: %d pkts cleaned\n", count);
 
 #define TX_WAKE_THRESHOLD 16
 	if (unlikely(count && netif_carrier_ok(netdev) &&
@@ -1339,7 +1316,7 @@ static bool jzmac_clean_rx_irq(struct jz_mac_local *lp,
 		if(!synopGMAC_is_rx_desc_valid(rx_desc->status)) {
 			/* save the skb in buffer_info as good */
 			buffer_info->skb = skb;
-			//printk("====>invalid pkt\n");
+			dev_err(&netdev->dev, "Invalid packet.\n");
 			goto invalid_pkt;
 		}
 
@@ -1351,6 +1328,7 @@ static bool jzmac_clean_rx_irq(struct jz_mac_local *lp,
 				length - 4);
 		printk("============================================\n");
 #endif
+
 		dma_unmap_single(&lp->netdev->dev,
 				buffer_info->dma, buffer_info->length,
 				DMA_FROM_DEVICE);
@@ -1466,7 +1444,6 @@ static irqreturn_t jz_mac_interrupt(int irq, void *data)
 	dma_status_reg = synopGMACReadReg((u32 *)gmacdev->DmaBase, DmaStatus);
 	mac_interrupt_status = synopGMACReadReg((u32 *)gmacdev->MacBase, GmacInterruptStatus);
 
-	//printk("===>enter %s:%d DmaStatus = 0x%08x\n", __func__, __LINE__, dma_status_reg);
 	if(dma_status_reg == 0)
 		return IRQ_NONE;
 
@@ -1529,10 +1506,11 @@ static irqreturn_t jz_mac_interrupt(int irq, void *data)
 	}
 
 	if(interrupt & synopGMACDmaRxStopped){
-		// Receiver gone in to stopped state
-		// why Rx Stopped? no enough descriptor? but why no enough descriptor need cause an interrupt?
-		// we have no enough descriptor because we can't handle packets that fast, isn't it?
-		// So I think if DmaRxStopped Interrupt can disabled
+		/* Receiver gone in to stopped state
+		 * why Rx Stopped? no enough descriptor? but why no enough descriptor need cause an interrupt?
+		 * we have no enough descriptor because we can't handle packets that fast, isn't it?
+		 * So I think if DmaRxStopped Interrupt can disabled
+		 */
 		dev_info(&netdev->dev, "%s::Receiver stopped seeing Rx interrupts\n",__FUNCTION__);
 
 		synopGMAC_enable_dma_rx(gmacdev);
@@ -1571,7 +1549,7 @@ static irqreturn_t jz_mac_interrupt(int irq, void *data)
 static void jz_mac_stop_activity(struct jz_mac_local *lp) {
 	synopGMAC_disable_interrupt_all(gmacdev);
 
-	// Disable the Dma in rx path
+	/* Disable the Dma in rx path */
 	synopGMAC_disable_dma_rx(gmacdev);
 	jzmac_take_desc_ownership_rx(lp);
 	//msleep(100);	      // Allow any pending buffer to be read by host
@@ -1580,7 +1558,7 @@ static void jz_mac_stop_activity(struct jz_mac_local *lp) {
 	synopGMAC_disable_dma_tx(gmacdev);
 	jzmac_take_desc_ownership_tx(lp);
 	//msleep(100);	      // allow any pending transmission to complete
-	// Disable the Mac for both tx and rx
+	/* Disable the Mac for both tx and rx */
 	//synopGMAC_tx_disable(gmacdev);
 }
 
@@ -1615,6 +1593,7 @@ static void jzmac_init(void) {
 
 	/* for we try to use duplex */
 	synopGMAC_rx_own_disable(gmacdev);
+
 	synopGMAC_loopback_off(gmacdev);
 	/* default to full duplex, I think this will be the common case */
 	synopGMAC_set_full_duplex(gmacdev);
@@ -1731,7 +1710,6 @@ static void jzmac_reset_task(struct work_struct *work)
 
 static void jzmac_multicast_hash(struct net_device *dev)
 {
-
 	struct netdev_hw_addr *ha;
 	u32 mc_filter[2];
 	u32 crc;
@@ -1748,7 +1726,6 @@ static void jzmac_multicast_hash(struct net_device *dev)
 		set_bit(~crc >> 26, (unsigned long *)mc_filter);
 	}
 
-	//__sal_set_hash_table(emac_hashhi, emac_hashlo);
 	/* TODO: set multicast hash filter here */
 	synopGMAC_write_hash_table_high(gmacdev, mc_filter[1]);
 	synopGMAC_write_hash_table_low(gmacdev, mc_filter[0]);
@@ -1759,20 +1736,26 @@ static void jzmac_set_multicast_list(struct net_device *dev)
 	if (dev->flags & IFF_PROMISC) {
 		/* Accept any kinds of packets */
 		synopGMAC_promisc_enable(gmacdev);
-		printk("%s: Enter promisc mode!\n",dev->name);
+		dev_info(&dev->dev, "%s: Enter promisc mode!\n",dev->name);
 	} else  if ((dev->flags & IFF_ALLMULTI) || (dev->mc.count > MULTICAST_FILTER_LIMIT)) {
 		/* Accept all multicast packets */
 		synopGMAC_multicast_enable(gmacdev);
 
 		/* TODO: accept broadcast and enable multicast here */
-		printk("%s: Enter allmulticast mode!   %d \n",dev->name,dev->mc.count);
+		dev_info(&dev->dev, "%s: Enter allmulticast mode!   %d \n",dev->name,dev->mc.count);
 	} else if (dev->mc.count) {
 		/* Update multicast hash table */
 		jzmac_multicast_hash(dev);
+
 		/* TODO: enable multicast here */
+		synopGMAC_promisc_disable(gmacdev);
+		synopGMAC_multicast_disable(gmacdev);
+		synopGMAC_multicast_hash_filter_enable(gmacdev);
 	} else {
 		/* FIXME: clear promisc or multicast mode */
 		synopGMAC_promisc_disable(gmacdev);
+		synopGMAC_multicast_disable(gmacdev);
+		synopGMAC_multicast_hash_filter_disable(gmacdev);
 	}
 }
 
@@ -1799,13 +1782,8 @@ static int jz_mac_set_mac_address(struct net_device *dev, void *p) {
 static int jz_mac_open(struct net_device *dev)
 {
 	struct jz_mac_local *lp = netdev_priv(dev);
-	int retval;
-
-	pr_debug("%s: %s\n", dev->name, __func__);
-
-	retval = phy_read(lp->phydev, MII_BMCR);
-	retval &= ~(1 << 11);
-	phy_write(lp->phydev, MII_BMCR, retval);
+	u16 phy_val;
+	int ret;
 
 	/*
 	 * Check that the address is valid.  If its not, refuse
@@ -1813,32 +1791,33 @@ static int jz_mac_open(struct net_device *dev)
 	 * address using ifconfig eth0 hw ether xx:xx:xx:xx:xx:xx
 	 */
 	if (!is_valid_ether_addr(dev->dev_addr)) {
-		printk(KERN_WARNING JZMAC_DRV_NAME ": no valid ethernet hw addr\n");
+		dev_warn(&dev->dev, "no valid ethernet hw addr\n");
 		return -EINVAL;
 	}
 
-	phy_write(lp->phydev, MII_BMCR, BMCR_RESET);
+	phy_val = phy_read(lp->phydev, MII_BMCR);
+	phy_val &= ~BMCR_PDOWN;
+	phy_val |= BMCR_RESET;
+	phy_write(lp->phydev, MII_BMCR, phy_val);
 	while(phy_read(lp->phydev, MII_BMCR) & BMCR_RESET);
+
 	phy_start(lp->phydev);
 
 	if (synopGMAC_reset(gmacdev) < 0) {
-		printk("func:%s, synopGMAC_reset failed\n", __func__);
+		dev_err(&dev->dev, "%s, synopGMAC_reset failed\n", __func__);
 		phy_stop(lp->phydev);
 		return -1;
 	}
 
 	/* init MDC CLK */
-	//synopGMAC_set_mdc_clk_div(gmacdev,GmiiCsrClk2);
-	synopGMAC_set_mdc_clk_div(gmacdev,GmiiCsrClk4);
+	synopGMAC_set_mdc_clk_div(gmacdev, lp->phymdc_csr);
 	gmacdev->ClockDivMdc = synopGMAC_get_mdc_clk_div(gmacdev);
 
 	/* initial rx and tx list */
-	retval = desc_list_init(lp);
+	ret = desc_list_init(lp);
 
-	if (retval)
-		return retval;
-
-
+	if (ret)
+		return ret;
 
 	setup_mac_addr(dev->dev_addr);
 	jz_mac_configure(lp);
@@ -1888,29 +1867,72 @@ static struct net_device_stats *jz_mac_get_stats(struct net_device *netdev)
 	return &lp->net_stats;
 }
 
-static int jz_mac_change_mtu(struct net_device *netdev, int new_mtu) {
-	printk("===>new_mtu = %d\n", new_mtu);
-#if 1
+static int jz_mac_change_mtu(struct net_device *netdev, int new_mtu)
+{
+	dev_info(&netdev->dev, "new_mtu = %d\n", new_mtu);
+
 	return eth_change_mtu(netdev, new_mtu);
-#else
-	netdev->mtu = new_mtu;
-	return 0;
-#endif
 }
 
-static int jzmac_do_ioctl(struct net_device *netdev, struct ifreq *ifr, s32 cmd) {
+static int jzmac_do_ioctl(struct net_device *netdev, struct ifreq *ifr, s32 cmd)
+{
 	struct jz_mac_local *lp = netdev_priv(netdev);
 
 	if (!netif_running(netdev)) {
-		printk("error : it is not in netif_running\n");
+		dev_err(&netdev->dev, "it is not in netif_running\n");
 		return -EINVAL;
 	}
 
-	if(!(lp->phydev->link))
+	if (!(lp->phydev->link))
 		return 0;
 
 	return generic_mii_ioctl(&lp->mii, if_mii(ifr), cmd, NULL);
 }
+
+#ifdef CONFIG_JZGPIO_PHY_RESET
+static int jzgpio_phy_reset(struct jz_gpio_phy_reset *gpio_phy_reset)
+{
+	int ret;
+
+	ret = gpio_request(gpio_phy_reset->gpio, "jzmac");
+	if (ret < 0) {
+		printk(KERN_ERR "cannot request reset gpio %d\n", gpio_phy_reset->gpio);
+		return ret;
+	}
+
+	gpio_direction_output(gpio_phy_reset->gpio, gpio_phy_reset->active_level);
+	mdelay(gpio_phy_reset->delaytime_msec);
+	gpio_direction_output(gpio_phy_reset->gpio, !gpio_phy_reset->active_level);
+	gpio_free(gpio_phy_reset->gpio);
+
+	return 0;
+}
+
+static int jzmac_phy_reset(struct jz_gpio_phy_reset *gpio_phy_reset)
+{
+#ifdef CONFIG_JZ_GPIO_SAVE
+	int error;
+	jz_gpio_save_reset_func(gpio_phy_reset->crtl_port, gpio_phy_reset->set_func,
+				gpio_phy_reset->crtl_pins, &(gpio_phy_reset->func));
+	error = gpio_request(gpio_phy_reset->gpio, "jzmac");
+	if (error < 0) {
+		printk("failed to request GPIO %d, error %d\n",
+		       gpio_phy_reset->gpio, error);
+		return error;
+	}
+	gpio_direction_output(gpio_phy_reset->gpio, gpio_phy_reset->active_level);
+	mdelay(gpio_phy_reset->delaytime_msec);
+	gpio_direction_output(gpio_phy_reset->gpio, !gpio_phy_reset->active_level);
+	gpio_free(gpio_phy_reset->gpio);
+	jz_gpio_restore_func(gpio_phy_reset->crtl_port, gpio_phy_reset->crtl_pins,
+			     &(gpio_phy_reset->func));
+
+	return 0;
+#else
+	return jzgpio_phy_reset(gpio_phy_reset);
+#endif
+}
+#endif /* CONFIG_JZGPIO_PHY_RESET */
 
 static const struct net_device_ops jz_mac_netdev_ops = {
 	.ndo_open		= jz_mac_open,
@@ -1925,7 +1947,7 @@ static const struct net_device_ops jz_mac_netdev_ops = {
 	.ndo_do_ioctl		= jzmac_do_ioctl,
 };
 
-static int jz_mac_probe(struct platform_device *pdev)
+static int __devinit jz_mac_probe(struct platform_device *pdev)
 {
 	struct net_device *ndev;
 	struct jz_mac_local *lp;
@@ -1933,22 +1955,15 @@ static int jz_mac_probe(struct platform_device *pdev)
 	int rc;
 	int i;
 
-	printk("=======>gmacdev = 0x%08x<================\n", (u32)gmacdev);
-	synopGMAC_multicast_enable(gmacdev);
 	if (gmacdev) {
-		printk("=========>gmacdev->MacBase = 0x%08x DmaBase = 0x%08x\n",
-				gmacdev->MacBase, gmacdev->DmaBase);
+		dev_info(&pdev->dev, "Gmacdev->MacBase=0x%08x DmaBase=0x%08x\n",
+		       gmacdev->MacBase, gmacdev->DmaBase);
 	}
+
 	if (synopGMAC_reset(gmacdev) < 0) {
-		printk("func:%s, synopGMAC_reset failed\n", __func__);
+		dev_err(&pdev->dev, "%s, synopGMAC_reset failed\n", __func__);
 		return -1;
-	}
-	/* init MDC CLK */
-	//synopGMAC_set_mdc_clk_div(gmacdev,GmiiCsrClk2);
-	synopGMAC_set_mdc_clk_div(gmacdev,GmiiCsrClk4);
-	gmacdev->ClockDivMdc = synopGMAC_get_mdc_clk_div(gmacdev);
-	/*Lets read the version of ip in to device structure*/
-	synopGMAC_read_version(gmacdev);
+	};
 
 	ndev = alloc_etherdev(sizeof(struct jz_mac_local));
 	if (!ndev) {
@@ -1959,16 +1974,20 @@ static int jz_mac_probe(struct platform_device *pdev)
 	SET_NETDEV_DEV(ndev, &pdev->dev);
 	platform_set_drvdata(pdev, ndev);
 	lp = netdev_priv(ndev);
-	lp->netdev = ndev;
-	lp->pdev = pdev;
+	lp->netdev	= ndev;
+	lp->pdev	= pdev;
+	lp->phymdc_csr	= gmacdev->ClockDivMdc;
 
+	/* init MDC CLK */
+	synopGMAC_set_mdc_clk_div(gmacdev, lp->phymdc_csr);
+	gmacdev->ClockDivMdc = synopGMAC_get_mdc_clk_div(gmacdev);
 	/* Lets read the version of ip in to device structure */
 	synopGMAC_read_version(gmacdev);
+
 	/* configure MAC address */
 	if (bootargs_ethaddr) {
-		for (i=0; i<6; i++) {
+		for (i = 0; i < 6; i++)
 			ndev->dev_addr[i] = ethaddr_hex[i];
-		}
 	} else {
 		random_ether_addr(ndev->dev_addr);
 	}
@@ -1994,19 +2013,19 @@ static int jz_mac_probe(struct platform_device *pdev)
 
 	/* Fill in the fields of the device structure with ethernet values. */
 	ether_setup(ndev);
-	/* Set NET state NOT has carrier
-	set_bit(__LINK_STATE_NOCARRIER, &ndev->state); *///JJJHHH
+	/* Set NET state NOT has carrier */
+	set_bit(__LINK_STATE_NOCARRIER, &ndev->state);
 
 	ndev->netdev_ops = &jz_mac_netdev_ops;
-	//ndev->ethtool_ops = &jz_mac_ethtool_ops;
 	ndev->watchdog_timeo = 2 * HZ;
+	jzmac_set_ethtool_ops(ndev);
 
-	lp->mii.phy_id	= lp->phydev->addr;
-	lp->mii.phy_id_mask  = 0x1f;
-	lp->mii.reg_num_mask = 0x1f;
-	lp->mii.dev	= ndev;
-	lp->mii.mdio_read    = jz_mdio_phy_read;
-	lp->mii.mdio_write   = jz_mdio_phy_write;
+	lp->mii.phy_id		= lp->phydev->addr;
+	lp->mii.phy_id_mask	= 0x1f;
+	lp->mii.reg_num_mask	= 0x1f;
+	lp->mii.dev		= ndev;
+	lp->mii.mdio_read	= jz_mdio_phy_read;
+	lp->mii.mdio_write	= jz_mdio_phy_write;
 	lp->mii.supports_gmii	= mii_check_gmii_support(&lp->mii);
 
 	netif_napi_add(ndev, &lp->napi, jzmac_clean, 32);
@@ -2036,14 +2055,10 @@ static int jz_mac_probe(struct platform_device *pdev)
 		goto out_err_reg_ndev;
 	}
 
-	/* phy_write(lp->phydev, MII_BMCR, BMCR_RESET); */
-	/* while(phy_read(lp->phydev, MII_BMCR) & BMCR_RESET); */
-	/* phy_start(lp->phydev); */
-
 	/* now, print out the card info, in a short format.. */
 	dev_info(&pdev->dev, "%s, Version %s\n", JZMAC_DRV_DESC, JZMAC_DRV_VERSION);
-	//	jzmac_dump_all_regs(__func__, __LINE__);
-	//synopGMAC_multicast_enable(gmacdev);
+	//jzmac_dump_all_regs(__func__, __LINE__);
+
 	return 0;
 
 out_err_reg_ndev:
@@ -2061,7 +2076,7 @@ out_err_probe_mac:
 	return rc;
 }
 
-static int  jz_mac_remove(struct platform_device *pdev)
+static int __devexit jz_mac_remove(struct platform_device *pdev)
 {
 	struct net_device *ndev = platform_get_drvdata(pdev);
 	struct jz_mac_local *lp = netdev_priv(ndev);
@@ -2088,8 +2103,9 @@ static int jz_mac_suspend(struct platform_device *pdev, pm_message_t mesg)
 
 	if (netif_running(net_dev))
 		jz_mac_close(net_dev);
-	clk_disable(clk_gate);
-	clk_disable(clk_cgu);
+
+	clk_disable(mac_clk);
+	clk_disable(phy_clk);
 
 	return 0;
 }
@@ -2098,13 +2114,9 @@ static int jz_mac_resume(struct platform_device *pdev)
 {
 	struct net_device *net_dev = platform_get_drvdata(pdev);
 
-	clk_enable(clk_gate);
-	clk_enable(clk_cgu);
+	clk_enable(phy_clk);
+	clk_enable(mac_clk);
 
-#ifdef CONFIG_JZGPIO_PHY_RESET
-	if(jzmac_phy_reset() < 0)
-		return -1;
-#endif
 	if (netif_running(net_dev))
 		jz_mac_open(net_dev);
 
@@ -2128,9 +2140,6 @@ static int jz_mdiobus_read(struct mii_bus *bus, int phy_addr, int regnum)
 	s32 status;
 
 	status = synopGMAC_read_phy_reg(gmacdev, phy_addr, regnum, &data);
-	//printk("=======>mdio read phy%d reg %d, return data = 0x%04x status = %d\n",
-	//		phy_addr, regnum, data, status);
-
 	/* if failed, set data to all 0 */
 	if (status)
 		data = 0;
@@ -2148,8 +2157,6 @@ static int jz_mdio_phy_read(struct net_device *dev, int phy_id, int location)
 static int jz_mdiobus_write(struct mii_bus *bus, int phy_addr, int regnum,
 		u16 value)
 {
-	//printk("======>mdio write phy%d reg %d with value = 0x%04x\n",
-	//		phy_addr, regnum, value);
 	return synopGMAC_write_phy_reg(gmacdev, phy_addr, regnum, value);
 }
 
@@ -2164,32 +2171,36 @@ static int jz_mdiobus_reset(struct mii_bus *bus)
 {
 	return 0;
 }
-static int  jz_mii_bus_probe(struct platform_device *pdev)
+static int __devinit jz_mii_bus_probe(struct platform_device *pdev)
 {
+	struct jz_ethphy_feature *phy_feature = dev_get_platdata(&pdev->dev);
 	struct mii_bus *miibus;
-	int rc = 0, i;
+	struct clk *sys_clk;
+	unsigned long sysclk_rate;
+	u32 max_mdcclk, ClkCsr;
+	int i;
+	int rc = 0;
 
-	clk_gate = clk_get(NULL, "mac");
-	clk_cgu = clk_get(NULL, "cgu_macphy");
-	if (clk_enable(clk_gate) < 0) {
-		printk("enable mac clk gate failed\n");
-		goto out_err_alloc;
+	mac_clk = clk_get(NULL, "mac");
+	if (clk_enable(mac_clk) < 0) {
+		dev_err(&pdev->dev, "enable mac clk failed\n");
+		clk_put(mac_clk);
+		goto out_err_mac_clk;
 	}
-	if (clk_enable(clk_cgu) < 0) {
-		printk("enable gmac clk cgu failed\n");
-		clk_put(clk_gate);
-		goto out_err_alloc;
-	}
-	clk_set_rate(clk_cgu, 50000000);
 
-	/* //	synopGMAC_multicast_enable(gmacdev); */
+	phy_clk = clk_get(NULL, "cgu_macphy");
+	if (clk_enable(phy_clk) < 0) {
+		dev_err(&pdev->dev, "enable phy clk failed\n");
+		clk_put(phy_clk);
+		goto out_err_phy_clk;
+	}
+	clk_set_rate(phy_clk, 50000000);
 
 #ifdef CONFIG_JZGPIO_PHY_RESET /* PHY hard reset */
-	{
-		gpio_phy_reset = dev_get_platdata(&pdev->dev);
-		rc = jzmac_phy_reset();
-		if(rc < 0)
-			goto out_err_alloc;
+	rc = jzmac_phy_reset(&phy_feature->phy_hwreset);
+	if(rc < 0) {
+		dev_err(&pdev->dev, "reset gpio not set.\n");
+		goto out_err_phy_reset;
 	}
 #endif
 
@@ -2201,14 +2212,34 @@ static int  jz_mii_bus_probe(struct platform_device *pdev)
 #endif
 
 	if (synopGMAC_reset(gmacdev) < 0) {
-		printk("func:%s, synopGMAC_reset failed\n", __func__);
-		return -1;
+		dev_err(&pdev->dev, "synopGMAC_reset failed\n");
+		return -EIO;
 	}
 
 	/* init MDC CLK */
+	/* Get AHB2 Clock */
+	sys_clk = clk_get(&pdev->dev, "h2clk");
+	sysclk_rate = clk_get_rate(sys_clk);
+	clk_put(sys_clk);
+
+	/* Get EthernetPHY mdc clock rate */
+	if (!phy_feature->mdc_mincycle) {
+		dev_err(&pdev->dev, "PHY mdc min cycle time NOT set.\n");
+		return -EINVAL;
+	}
+	max_mdcclk = 1000000000 / phy_feature->mdc_mincycle;
+
+	/* Calculate Csr clock div */
+	ClkCsr = synopGMAC_calculate_mdc_clk_csr((u32)sysclk_rate, max_mdcclk);
+	if (ClkCsr == ~(u32)0) {
+		dev_err(&pdev->dev, "PHY mdc clock out of band.\n");
+		return -EINVAL;
+	}
+
 	/* The CSR clock is used to generate the MDC clock for the SMA interface. */
-	synopGMAC_set_mdc_clk_div(gmacdev,GmiiCsrClk4);
+	synopGMAC_set_mdc_clk_div(gmacdev, ClkCsr);
 	gmacdev->ClockDivMdc = synopGMAC_get_mdc_clk_div(gmacdev);
+	gmacdev->ClockDivMdc = ClkCsr;
 
 	synopGMAC_disable_interrupt_all(gmacdev);
 
@@ -2216,8 +2247,11 @@ static int  jz_mii_bus_probe(struct platform_device *pdev)
 
 	rc = -ENOMEM;
 	miibus = mdiobus_alloc();
-	if (miibus == NULL)
+	if (miibus == NULL) {
+		dev_err(&pdev->dev, "Cannot alloc mdiobus.\n");
 		goto out_err_alloc;
+	}
+
 	miibus->read = jz_mdiobus_read;
 	miibus->write = jz_mdiobus_write;
 	miibus->reset = jz_mdiobus_reset;
@@ -2226,8 +2260,11 @@ static int  jz_mii_bus_probe(struct platform_device *pdev)
 	miibus->name = "jz_mii_bus";
 	snprintf(miibus->id, MII_BUS_ID_SIZE, "0");
 	miibus->irq = kmalloc(sizeof(int)*PHY_MAX_ADDR, GFP_KERNEL);
-	if (miibus->irq == NULL)
-		goto out_err_alloc;
+	if (miibus->irq == NULL) {
+		dev_err(&pdev->dev, "Cannnot alloc MII irq.\n");
+		goto out_err_irq_alloc;
+	}
+
 	for (i = 0; i < PHY_MAX_ADDR; ++i)
 		miibus->irq[i] = PHY_POLL;
 
@@ -2238,26 +2275,40 @@ static int  jz_mii_bus_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, miibus);
-	//	synopGMAC_multicast_enable(gmacdev);
+
 	return 0;
 
 out_err_mdiobus_register:
+	kfree(miibus->irq);
+
+out_err_irq_alloc:
 	mdiobus_free(miibus);
 
 out_err_alloc:
+out_err_phy_reset:
+	clk_disable(phy_clk);
+	clk_put(phy_clk);
+
+out_err_phy_clk:
+	clk_disable(mac_clk);
+	clk_put(mac_clk);
+
+out_err_mac_clk:
 
 	return rc;
 }
 
-static int  jz_mii_bus_remove(struct platform_device *pdev)
+static int __devexit jz_mii_bus_remove(struct platform_device *pdev)
 {
 	struct mii_bus *miibus = platform_get_drvdata(pdev);
 
 	platform_set_drvdata(pdev, NULL);
 	mdiobus_unregister(miibus);
 	mdiobus_free(miibus);
-	clk_put(clk_gate);
-	clk_put(clk_cgu);
+
+	clk_put(mac_clk);
+	clk_put(phy_clk);
+
 	return 0;
 }
 
@@ -2289,10 +2340,17 @@ static struct platform_driver jz_mac_driver = {
 	},
 };
 
+static int jzmac_device_match(struct device *dev, void *data)
+{
+	struct device_driver *drv = (struct device_driver *)data;
+	return drv->bus->match(dev, drv);
+}
+
 #define JZ_GMAC_BASE 0xb34b0000
 
 static int __init jz_mac_init(void)
 {
+	struct device *mii_dev;
 #ifndef CONFIG_MDIO_GPIO
 	int ret;
 #endif
@@ -2307,16 +2365,26 @@ static int __init jz_mac_init(void)
 	gmacdev->DmaBase =  JZ_GMAC_BASE + DMABASE;
 	gmacdev->MacBase =  JZ_GMAC_BASE + MACBASE;
 
-	synopGMAC_multicast_enable(gmacdev);
 #ifndef CONFIG_MDIO_GPIO
 	ret = platform_driver_register(&jz_mii_bus_driver);
-	if (!ret) {
-		return platform_driver_register(&jz_mac_driver);
-	}
-	return -ENODEV;
-#else
-	return platform_driver_register(&jz_mac_driver);
+	if (ret)
+		return ret;
 
+	/* platform_driver_register() don't to check driver.probe()
+	 * return value. So if driver.probe() failed, it don't return
+	 * error number.
+	 *
+	 * We need to check mdio bus driver has attached a device.
+	 */
+	mii_dev = driver_find_device(&jz_mii_bus_driver.driver, NULL,
+				&jz_mii_bus_driver.driver, jzmac_device_match);
+	if (!mii_dev)
+		return -ENODEV;
+
+	return platform_driver_register(&jz_mac_driver);
+#else
+	gmacdev->ClockDivMdc = 0;
+	return platform_driver_register(&jz_mac_driver);
 #endif
 }
 

@@ -39,9 +39,9 @@
 /* ****************************GPIO KEY END******************************** */
 
 /* ****************************GPIO USB START******************************** */
-#define GPIO_USB_ID             GPIO_PD(2)/*GPIO_PD(2)*/
+#define GPIO_USB_ID             GPIO_PC(21)
 #define GPIO_USB_ID_LEVEL       LOW_ENABLE
-#define GPIO_USB_DETE           GPIO_PB(8) /*GPIO_PB(8)*/
+#define GPIO_USB_DETE           GPIO_PC(22)
 #define GPIO_USB_DETE_LEVEL     LOW_ENABLE
 #define GPIO_USB_DRVVBUS        GPIO_PB(25)
 #define GPIO_USB_DRVVBUS_LEVEL      HIGH_ENABLE
@@ -51,7 +51,7 @@
 #define GPIO_HP_MUTE        -1  /*hp mute gpio*/
 #define GPIO_HP_MUTE_LEVEL  -1  /*vaild level*/
 
-#define GPIO_SPEAKER_EN    	GPIO_PC(23)         /*speaker enable gpio*/
+#define GPIO_SPEAKER_EN    	-1         /*speaker enable gpio*/
 #define GPIO_SPEAKER_EN_LEVEL   0
 #define GPIO_AMP_POWER_EN	-1	/* amp power enable pin */
 #define GPIO_AMP_POWER_EN_LEVEL	-1
@@ -73,6 +73,21 @@
 #define HOOK_ACTIVE_LEVEL       -1
 
 /* ****************************GPIO AUDIO END******************************** */
+
+/* ****************************GPIO GMAC START******************************* */
+#ifdef CONFIG_JZ_MAC
+#ifndef CONFIG_MDIO_GPIO
+#ifdef CONFIG_JZGPIO_PHY_RESET
+#define GMAC_PHY_PORT_GPIO GPIO_PC(23)
+#define GMAC_PHY_ACTIVE_HIGH 0
+#define GMAC_PHY_DELAYTIME 10
+#endif
+#else /* CONFIG_MDIO_GPIO */
+#define MDIO_MDIO_MDC_GPIO GPIO_PB(13)
+#define MDIO_MDIO_GPIO GPIO_PB(14)
+#endif
+#endif /* CONFIG_JZ_MAC */
+/* ****************************GPIO GMAC END********************************* */
 
 /* ****************************GPIO LCD START****************************** */
 #ifdef  CONFIG_LCD_XRM2002903

@@ -108,7 +108,7 @@ int inline reset_keep_power(void)
 			     inl(RTC_IOBASE + RTC_PWRONCR) & ~(1 << 0));
 }
 
-#define HWFCR_WAIT_TIME(x) ((x > 0x7fff ? 0x7fff: (0x7ff*(x)) / 2000) << 5)
+#define HWFCR_WAIT_TIME(x) ((x > 0x7ff ? 0x7ff: (0x7ff*(x)) / 2000) << 5)
 #define HRCR_WAIT_TIME(x) ((((x) > 1875 ? 1875: (x)) / 125) << 11)
 
 void jz_hibernate(void)

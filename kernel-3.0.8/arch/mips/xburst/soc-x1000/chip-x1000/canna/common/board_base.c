@@ -83,6 +83,11 @@ static struct jz_platform_device platform_devices_array[] __initdata = {
 #ifdef CONFIG_BCM_AP6212_RFKILL
 	DEF_DEVICE(&bt_power_device, 0, 0),
 #endif
+
+#ifdef CONFIG_BCM_AP6255_RFKILL
+	DEF_DEVICE(&bt_power_device, 0, 0),
+#endif
+
 /* JZ ALSA audio driver */
 
 #if defined(CONFIG_SND_ASOC_JZ_AIC_V12)
@@ -146,7 +151,11 @@ static struct jz_platform_device platform_devices_array[] __initdata = {
 #endif
 
 #ifdef CONFIG_AKM4345_EXTERNAL_CODEC
-        DEF_DEVICE(&akm4345_spi_device, &akm4345_spi_data, sizeof(struct akm4345_platform_data)),
+	DEF_DEVICE(&akm4345_spi_device, &akm4345_spi_data, sizeof(struct akm4345_platform_data)),
+#endif
+
+#ifdef CONFIG_NPCA110P_EXTERNAL_CODEC
+	DEF_DEVICE(&npca110p_codec_device, &npca110p_codec_data, sizeof(struct snd_codec_data)),
 #endif
 
 /* JZ LCD driver */

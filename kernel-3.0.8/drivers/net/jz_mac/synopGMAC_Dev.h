@@ -1513,7 +1513,6 @@ enum MMC_CNTRL_REG_BIT_DESCRIPTIONS
 	GmacMmcCounterResetOnRead	= 0x00000004,		/* when set MMC counters will be reset to 0 after read				*/
 	GmacMmcCounterStopRollover	= 0x00000002,		/* when set counters will not rollover after max value				*/
 	GmacMmcCounterReset		= 0x00000001,		/* when set all counters wil be reset (automatically cleared after 1 clk)	*/
-
 };
 
 enum MMC_RX_INTR_MASK_AND_STATUS_BIT_DESCRIPTIONS
@@ -1572,7 +1571,6 @@ enum MMC_TX_INTR_MASK_AND_STATUS_BIT_DESCRIPTIONS
 	GmacMmcTxBcFramesInt 		= 0x00000004,		/* set when GmacMmcTxBcFramesG counter reaches half of max value		*/
 	GmacMmcTxFrameGbInt 		= 0x00000002,		/* set when GmacMmcTxFrameCountGb counter reaches half of max value		*/
 	GmacMmcTxOctetGbInt 		= 0x00000001,		/* set when GmacMmcTxOctetCountGb counter reaches half of max value		*/
-
 };
 
 
@@ -1631,13 +1629,12 @@ enum PTPMessageType
 
 typedef struct TimeStampStruct
 {
-	u32   TSversion;      /* PTP Version 1 or PTP version2                                                                          */
-	u32   TSmessagetype;  /* Message type associated with this time stamp                                                           */
+	u32   TSversion;      /* PTP Version 1 or PTP version2 */
+	u32   TSmessagetype;  /* Message type associated with this time stamp */
 
-	u16   TShighest16;    /* Highest 16 bit time stamp value, Valid onley when ADV_TIME_HIGH_WORD configured in corekit		  */
-	u32   TSupper32;      /* Most significant 32 bit time stamp value								  */
-	u32   TSlower32;      /* Least Significat 32 bit time stamp value								  */
-
+	u16   TShighest16;    /* Highest 16 bit time stamp value, Valid onley when ADV_TIME_HIGH_WORD configured in corekit */
+	u32   TSupper32;      /* Most significant 32 bit time stamp value */
+	u32   TSlower32;      /* Least Significat 32 bit time stamp value */
 } TimeStamp;
 
 
@@ -1778,8 +1775,7 @@ void synopGMAC_TS_coarse_update(synopGMACdevice *gmacdev);			// Only if "fine co
 void synopGMAC_TS_fine_update(synopGMACdevice *gmacdev);			// Only if "fine correction" enabled
 
 void synopGMAC_TS_subsecond_init(synopGMACdevice *gmacdev, u32 sub_sec_inc_val); // Update should happen making use of subsecond mask
-void synopGMAC_TS_read_timestamp(synopGMACdevice *gmacdev, u16 * higher_sec_val,
-		u32 * sec_val, u32 *  sub_sec_val);                   // Reads the timestamp low,high and higher(Ver2) registers in the the struct pointer; readonly contents
+void synopGMAC_TS_read_timestamp(synopGMACdevice *gmacdev, u16 * higher_sec_val, u32 * sec_val, u32 *  sub_sec_val); // Reads the timestamp low,high and higher(Ver2) registers in the the struct pointer; readonly contents
 void synopGMAC_TS_load_target_timestamp(synopGMACdevice *gmacdev, u32 sec_val, u32 sub_sec_val); //Loads the timestamp target register with the values provided
 
 void synopGMAC_TS_load_timestamp_higher_val(synopGMACdevice *gmacdev, u32 higher_sec_val);
@@ -1792,6 +1788,7 @@ void synopGMAC_TS_read_target_timestamp(synopGMACdevice *gmacdev, u32 * sec_val,
  **********************************************************/
 s32 synopGMAC_set_mdc_clk_div(synopGMACdevice *gmacdev,u32 clk_div_val);
 u32 synopGMAC_get_mdc_clk_div(synopGMACdevice *gmacdev);
+u32 synopGMAC_calculate_mdc_clk_csr(u32 sysclk, u32 max_mdcclk);
 s32 synopGMAC_read_phy_reg(synopGMACdevice *gmacdev, u32 PhyBase, u32 RegOffset, u16 * data);
 s32 synopGMAC_write_phy_reg(synopGMACdevice *gmacdev, u32 PhyBase, u32 RegOffset, u16 data);
 s32 synopGMAC_phy_loopback(synopGMACdevice *gmacdev, bool loopback);
@@ -1900,16 +1897,14 @@ bool synopGMAC_is_rx_desc_chained(DmaDesc * desc);
 bool synopGMAC_is_tx_desc_chained(DmaDesc * desc);
 void synopGMAC_get_desc_data(DmaDesc * desc, u32 * Status, u32 * Buffer1, u32 * Length1, u32 * Data1, u32 * Buffer2, u32 * Length2, u32 * Data2);
 #ifdef ENH_DESC_8W
-s32 synopGMAC_get_tx_qptr(synopGMACdevice * gmacdev, u32 * Status, u32 * Buffer1, u32 * Length1, u32 * Data1, u32 * Buffer2, u32 * Length2, u32 * Data2,
-		u32 * Ext_Status, u32 * Time_Stamp_High, u32 * Time_Stamp_low);
+s32 synopGMAC_get_tx_qptr(synopGMACdevice * gmacdev, u32 * Status, u32 * Buffer1, u32 * Length1, u32 * Data1, u32 * Buffer2, u32 * Length2, u32 * Data2, u32 * Ext_Status, u32 * Time_Stamp_High, u32 * Time_Stamp_low);
 #else
 s32 synopGMAC_get_tx_qptr(synopGMACdevice * gmacdev, u32 * Status, u32 * Buffer1, u32 * Length1, u32 * Data1, u32 * Buffer2, u32 * Length2, u32 * Data2 );
 #endif
 s32 synopGMAC_set_tx_qptr(synopGMACdevice * gmacdev, u32 Buffer1, u32 Length1, u32 Data1, u32 Buffer2, u32 Length2, u32 Data2,u32 offload_needed);
 s32 synopGMAC_set_rx_qptr(synopGMACdevice * gmacdev, u32 Buffer1, u32 Length1, u32 Data1, u32 Buffer2, u32 Length2, u32 Data2);
 #ifdef ENH_DESC_8W
-s32 synopGMAC_get_rx_qptr(synopGMACdevice * gmacdev, u32 * Status, u32 * Buffer1, u32 * Length1, u32 * Data1, u32 * Buffer2, u32 * Length2, u32 * Data2,
-		u32 * Ext_Status, u32 * Time_Stamp_High, u32 * Time_Stamp_low);
+s32 synopGMAC_get_rx_qptr(synopGMACdevice * gmacdev, u32 * Status, u32 * Buffer1, u32 * Length1, u32 * Data1, u32 * Buffer2, u32 * Length2, u32 * Data2, u32 * Ext_Status, u32 * Time_Stamp_High, u32 * Time_Stamp_low);
 #else
 s32 synopGMAC_get_rx_qptr(synopGMACdevice * gmacdev, u32 * Status, u32 * Buffer1, u32 * Length1, u32 * Data1, u32 * Buffer2, u32 * Length2, u32 * Data2);
 #endif

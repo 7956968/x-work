@@ -56,7 +56,9 @@
 #define CONFIG_BAUDRATE			57600
 #endif
 
+#ifndef CONFIG_NO_PRINT
 #define CONFIG_UART2_PC
+#endif
 
 /*#define CONFIG_DDR_TEST*/
 #define CONFIG_DDR_PARAMS_CREATOR
@@ -83,7 +85,6 @@
 #define CONFIG_MDDR_EMD56164PC_50I
 #endif
 
-#define CONFIG_AUDIO_CAL_DIV
 #define CONFIG_AUDIO_APLL CONFIG_SYS_APLL_FREQ
 #define CONFIG_AUDIO_MPLL CONFIG_SYS_MPLL_FREQ
 
@@ -132,7 +133,11 @@
 #elif defined CONFIG_64MB_LPDDR
 #define BOOTARGS_BASE "console=ttyS2,57600n8 consoleblank=0 mem=64M "
 #else
+#ifdef CONFIG_NO_PRINT
+#define BOOTARGS_BASE "consoleblank=0 mem=32M "
+#else
 #define BOOTARGS_BASE "console=ttyS2,57600n8 consoleblank=0 mem=32M "
+#endif
 #endif
 
 #if defined CONFIG_GET_WIFI_MAC

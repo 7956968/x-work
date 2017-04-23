@@ -53,4 +53,8 @@ int first_class_key_switch_source();
 int first_class_disconnect_switch_source();
 void mozart_refresh_volume(void);
 
+#if(SUPPORT_USB_AUDIO == 1)
+extern void mozart_usb_audio_plug_in(void);
+extern void mozart_usb_audio_plug_out(void);
+#endif
 #endif	/* __MOZART_KEY_FUNCTION_H__ */

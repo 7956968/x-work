@@ -251,9 +251,9 @@ int dm_key_releaseed(int code)
 	return 0;
 }
 
-int interrupt_contentget_and_vrasr()
+int interrupt_vrasr()
 {
-	mozart_vr_content_get_interrupt();
+	//mozart_vr_content_get_interrupt();
 	if (mozart_vr_get_status() == VR_ASR) {
 		printf("ASR mode, interrupt\n");
 		mozart_vr_asr_break();
@@ -266,7 +266,7 @@ int dm_key_pressed(int code)
 	g_touch = 1;
 	update_led_status();
 	if (code != KEY_VOLUMEUP && code != KEY_VOLUMEDOWN && code != KEY_MENU && code != KEY_PLAYPAUSE) //忽略KEY_MENU 按键，因为模式切换有可能不会退出云音乐播放，所以不能打断contentget; 在模式切换的逻辑执行打断
-		interrupt_contentget_and_vrasr();
+		interrupt_vrasr();
 	return 0;
 }
 

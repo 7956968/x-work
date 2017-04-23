@@ -287,6 +287,10 @@ int stop(app_t app)
 
 int startall(int depend_network)
 {
+
+#ifdef SUPPORT_VR
+	wifi_info_t infor = get_wifi_mode();
+#endif
 	if (depend_network == -1 || depend_network == 1) {
 #if (SUPPORT_DMR == 1)
 		start(DMR);
@@ -299,9 +303,8 @@ int startall(int depend_network)
 		start(AIRPLAY);
 #endif
 #ifdef SUPPORT_VR
-	//if start vr in ap mode without authorization, it will stuck some time. 
-	if (get_wifi_mode().wifi_mode == STA)
-		start(VR);
+		if (infor.wifi_mode == STA)
+			start(VR);
 #endif
 #if (SUPPORT_LAPSULE == 1)
 		start(LAPSULE);
@@ -312,6 +315,8 @@ int startall(int depend_network)
 		mozart_appserver_register_callback(1 * 1024 * 1024, appserver_cmd_callback);
 #endif
 
+//hzb add
+//Ä¬ÈÏ²¥·Å£¬¹Ø±Õ
 #if 0
 #if (SUPPORT_LOCALPLAYER == 1)
 		if (snd_source != SND_SRC_LOCALPLAY) {

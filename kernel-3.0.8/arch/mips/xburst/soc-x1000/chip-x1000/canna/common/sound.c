@@ -87,6 +87,15 @@ struct akm4345_platform_data akm4345_spi_data = {
 };
 
 struct platform_device akm4345_spi_device = {
-        .name = "akm4345_spi",
+	.name = "akm4345_spi",
+};
+#endif
+
+#ifdef CONFIG_NPCA110P_EXTERNAL_CODEC
+struct snd_codec_data npca110p_codec_data = {
+	.gpio_spk_en = {.gpio = GPIO_NPCA110P_SPK_EN, .active_level = GPIO_NPCA110P_SPEAKER_EN_LEVEL},
+};
+struct platform_device npca110p_codec_device = {
+	.name = "npca110p_codec",
 };
 #endif

@@ -1,6 +1,9 @@
 #ifndef __MOZART_MODULE_BT_H__
 #define __MOZART_MODULE_BT_H__
 
+#include <inttypes.h>
+#include "resample_interface.h"
+#include "channels_interface.h"
 #include "bluetooth_interface.h"
 
 /* A2DP Source */
@@ -28,6 +31,7 @@
 /* SPP Client */
 #define SUPPORT_BSA_SPPC			0
 
+//hzb add
 #if SUPPORT_BTREMOTE !=  1
 /* BSA BLE SUPPORT */
 #define SUPPORT_BSA_BLE				0
@@ -52,6 +56,10 @@
 #define SUPPORT_BSA_BLE_HH_DIALOG_AUDIO		1
 #endif
 
+/* Automatic Echo Cancellation RESAMPLE SUPPORT */
+#define SUPPORT_AEC_RESAMPLE			0
+#define SUPPORT_AEC_RESAMPLE_48K_TO_8K		0
+
 //HZB add
 #if (BT_CALL_RESAMPLE_96K == 1)
 /* BSA HFP HF RESAMPLE SUPPORT */
@@ -62,11 +70,47 @@
 #define SUPPORT_BSA_HS_RESAMPLE			0
 #define SUPPORT_BSA_HS_RESAMPLE_8K_to_48K	0
 #endif
-/* Automatic Echo Cancellation RESAMPLE SUPPORT */
-#define SUPPORT_AEC_RESAMPLE			0
-#define SUPPORT_AEC_RESAMPLE_48K_TO_8K		0
+
+#if (SUPPORT_BSA_HFP_HF == 1)
+typedef struct {
+	int  in_len;
+	char *in_buf;
+	char *out_buf;
+	int  out_len;
+	int  max_outlen;
+	af_resample_t *resample_t;
+} hs_resample_info;
+
+typedef struct {
+	int  in_len;
+	char *in_buf;
+	char *out_buf;
+	int  out_len;
+	int  max_outlen;
+	af_channels_t *channel_t;
+} hs_rechannel_info;
+
+typedef struct {
+	hs_resample_info  res;
+	hs_rechannel_info rec;
+} hs_resample_param;
+
+hs_resample_param hs_bt;
+hs_resample_param hs_record;
+
+#if (SUPPORT_WEBRTC == 1)
+typedef struct {
+	unsigned int outlen;
+	char *outbuf;
+	hs_resample_param aec;
+} hs_aec_param;
+
+hs_resample_param hs_ref;
+hs_aec_param hs_aec;
+#endif /* SUPPORT_WEBRTC */
+#endif /* SUPPORT_BSA_HFP_HF */
+
 
 extern int start_bt(void);
 extern int stop_bt(void);
-
 #endif /* __MOZART_MODULE_BT_H__ */

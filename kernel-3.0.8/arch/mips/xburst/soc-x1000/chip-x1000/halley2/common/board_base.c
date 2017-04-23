@@ -170,6 +170,11 @@ static struct jz_platform_device platform_devices_array[] __initdata = {
 	DEF_DEVICE(&jz_spi_gpio_device, 0,0),
 #endif
 
+#ifdef CONFIG_JZ_MAC
+	DEF_DEVICE(&jz_mii_bus, 0, 0),
+	DEF_DEVICE(&jz_mac_device, 0, 0),
+#endif
+
 #ifdef CONFIG_JZ_SPI0
 	DEF_DEVICE(&jz_ssi0_device, &spi0_info_cfg, sizeof(struct jz_spi_info)),
 #endif

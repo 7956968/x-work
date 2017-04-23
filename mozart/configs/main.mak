@@ -1,7 +1,9 @@
-target := main
 main_DIR := $(TOPDIR)/src/main
+
+ifndef MAIN_APP
 TARGETS += main
 TARGETS1 += main
+endif
 
 SUPPORT_BT_MODULE ?= 0
 SUPPORT_VR ?= 0

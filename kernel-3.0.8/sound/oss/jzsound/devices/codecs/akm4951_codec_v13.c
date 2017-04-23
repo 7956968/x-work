@@ -31,6 +31,10 @@
 #endif
 #include "../xb47xx_i2s_v13.h"
 
+#define HPL_HPR_REPLAY
+//#define LOUT_ROUT_REPLAY
+//#define SPP_SPN_REPLAY
+
 #define DEFAULT_REPLAY_SAMPLE_RATE   48000
 #define AKM4951_EXTERNAL_CODEC_CLOCK 24000000
 //#define CODEC_MODE  CODEC_SLAVE
@@ -41,6 +45,7 @@ static struct early_suspend early_suspend;
 #endif
 static unsigned char power_reg0;
 static unsigned char power_reg1;
+static unsigned char power_reg2;
 static int user_replay_volume = 100;
 static unsigned long user_replay_rate = 0;
 /* user_linein_state and user_replay_state is just for mute the speaker, when no linein or i2s replay */
@@ -389,8 +394,30 @@ static int codec_dac_setup(void)
 	/* Power on DAC ADC DSP */
 	data = 0xc7;
 	ret |= akm4951_i2c_write_regs(0x00, &data, 1);
+#ifdef LOUT_ROUT_REPLAY
+	data = 0x24;
+	ret |= akm4951_i2c_write_regs(0x04, &data, 1);
+	data = 0x8d;
+	ret |= akm4951_i2c_write_regs(0x01, &data, 1);
+	data = 0x8f;
+	ret |= akm4951_i2c_write_regs(0x01, &data, 1);
+	msleep(5);
+	data = 0x80;
+	ret |= akm4951_i2c_write_regs(0x02, &data, 1);
+#elif defined(SPP_SPN_REPLAY)
+	data = 0x8c;
+	ret |= akm4951_i2c_write_regs(0x01, &data, 1);
+	data = 0x8e;
+	ret |= akm4951_i2c_write_regs(0x01, &data, 1);
+	data = 0x20;
+	ret |= akm4951_i2c_write_regs(0x02, &data, 1);
+	msleep(5);
+	data = 0xa0;
+	ret |= akm4951_i2c_write_regs(0x02, &data, 1);
+#else
 	data = 0xbc;
 	ret |= akm4951_i2c_write_regs(0x01, &data, 1);
+#endif
 
 	if (ret)
 		printk("===>ERROR: akm4951 init error!\n");
@@ -509,15 +536,24 @@ static int codec_suspend(void)
 	int ret = 0;
 	unsigned char data;
 	gpio_disable_spk_en();
-	akm4951_i2c_read_reg(0x00, &data, 1);
-	power_reg0 = data;
-	data &= 0x40;
-	ret |= akm4951_i2c_write_regs(0x00, &data, 1);
+
+	akm4951_i2c_read_reg(0x02, &data, 1);
+	power_reg2 = data;
+	data &= 0x7f;
+	ret |= akm4951_i2c_write_regs(0x02, &data, 1);
 	msleep(5);
+
 	akm4951_i2c_read_reg(0x01, &data, 1);
 	power_reg1 = data;
 	data &= 0xcd;
 	ret |= akm4951_i2c_write_regs(0x01, &data, 1);
+	msleep(5);
+
+	akm4951_i2c_read_reg(0x00, &data, 1);
+	power_reg0 = data;
+	data &= 0x40;
+	ret |= akm4951_i2c_write_regs(0x00, &data, 1);
+
 	return 0;
 }
 
@@ -528,9 +564,15 @@ static int codec_resume(void)
 	data = power_reg0;
 	ret |= akm4951_i2c_write_regs(0x00, &data, 1);
 	msleep(5);
+
 	data = power_reg1;
 	ret |= akm4951_i2c_write_regs(0x01, &data, 1);
+	msleep(5);
+
+	data = power_reg2;
+	ret |= akm4951_i2c_write_regs(0x02, &data, 1);
 	msleep(50);
+
 	if (user_replay_volume && (user_replay_state || user_linein_state))
 		gpio_enable_spk_en();
 	return 0;
@@ -549,7 +591,20 @@ static int codec_shutdown(void)
 	}
 	dev = &akm4951_client->dev;
 	akm4951 = dev->platform_data;
+
 	gpio_disable_spk_en();
+
+	akm4951_i2c_read_reg(0x02, &data, 1);
+	data &= 0x7f;
+        ret |= akm4951_i2c_write_regs(0x02, &data, 1);
+
+	akm4951_i2c_read_reg(0x01, &data, 1);
+	data &= 0xcd;
+	ret |= akm4951_i2c_write_regs(0x01, &data, 1);
+
+	akm4951_i2c_read_reg(0x00, &data, 1);
+	data &= 0x40;
+	ret |= akm4951_i2c_write_regs(0x00, &data, 1);
 
 	akm4951_i2c_read_reg(0x01, &data, 1);
 	data &= 0xfb;

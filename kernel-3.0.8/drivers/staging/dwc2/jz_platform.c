@@ -317,6 +317,20 @@ err1:
 	return retval;
 }
 
+static int dwc2_driver_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	/* USB PHY SUSPEND */
+	jz_otg_phy_suspend(1);
+	return 0;
+}
+
+static int dwc2_driver_resume(struct platform_device *pdev)
+{
+	/* USB PHY NOT SUSPEND */
+	jz_otg_phy_suspend(0);
+	return 0;
+}
+
 static struct platform_driver dwc2_platform_driver = {
 	.driver = {
 		.name = dwc2_driver_name,
@@ -325,6 +339,8 @@ static struct platform_driver dwc2_platform_driver = {
 	},
 	.probe = dwc2_driver_probe,
 	.remove = dwc2_driver_remove,
+	.suspend = dwc2_driver_suspend,
+        .resume = dwc2_driver_resume,
 };
 
 static int __init dwc2_jz_init(void)

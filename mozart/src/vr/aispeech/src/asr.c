@@ -54,12 +54,12 @@ char *_new_asr_param(sds_info_t *sds_info){
 				json_object_object_add(sdsExpand, "contextId", json_object_new_string(sds_info->contextId));
 			}
 			if (sds_info->env){
-				json_object_object_add(sdsExpand, "env", json_object_new_string(sds_info->env));
+				json_object_object_add(request, "env", json_object_new_string(sds_info->env));
 			}
 		}
 		free(_asr_mult_sds_param);
 		_asr_mult_sds_param = NULL;
-		_asr_mult_sds_param = (char *)json_object_to_json_string(root);
+		_asr_mult_sds_param = strdup((char *)json_object_to_json_string(root));
 		if(root){
 		    json_object_put(root);
 	    }
@@ -123,7 +123,9 @@ int _asr_callback(void *usrdata, const char *id, int type, const void *message, 
 			json_object_put(result_test);
 		}	//*/
 #else
+#ifdef DEBUG_SHOW_ALL
 		printf("%.*s\n", size, (char *) message);
+#endif
 		if(slot_resolve(result, &ai_vr_info.asr) == -1){
 			ai_vr_info.asr.state = ASR_FAIL;
 		} else {
@@ -139,6 +141,10 @@ int _asr_callback(void *usrdata, const char *id, int type, const void *message, 
     }
 
 	if (json_object_object_get_ex(out, "error", &error)){
+#ifdef DEBUG_SHOW_ALL
+		printf("%.*s\n", size, (char *) message);
+#endif
+
 		slot_free(&ai_vr_info.asr);
 		if (json_object_get_string(error)){
 			ai_vr_info.asr.error = strdup(json_object_get_string(error));
@@ -165,10 +171,13 @@ exit_error:
 }
 
 
-int asr_start(void){
+int asr_start(bool sds)
+{
 	char uuid[64] = {0};
 	const void *usrdata  ;//= NULL;
 	ai_vr_info.asr.state = ASR_START;
+	if (sds)
+		ai_vr_info.asr.sds.is_mult_sds = true;
 	return aiengine_start(sds_agn,
 			_new_asr_param(&ai_vr_info.asr.sds),
 			uuid, _asr_callback, &usrdata);

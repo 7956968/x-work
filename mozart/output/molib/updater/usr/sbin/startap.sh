@@ -47,7 +47,7 @@ elif [ $# -eq 1 ]; then
 	encrypt=no
 else
 	ssid=`hostname`-$MACID
-	passwd=$MACID
+	passwd=88888888
 	encrypt=yes
 fi
 

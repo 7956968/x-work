@@ -24,7 +24,7 @@ static const char *_tts_param =
         \"coreType\": \"cn.sent.syn\",\
         \"res\": \"syn_chnsnt_zhilingf\",\
         \"speechRate\": 0.85,\
-        \"speechVolume\": 80,\
+        \"speechVolume\": 80\
     }\
 }";
 

@@ -56,7 +56,7 @@ static int mulroom_change_audio_output(char *ao_iface)
 	return err;
 }
 
-int mozart_mulroom_audio_change(mulroom_ao_mode_t mode)
+int module_mulroom_audio_change(mulroom_ao_mode_t mode)
 {
 	int err;
 
@@ -112,7 +112,7 @@ static int mulroom_update_time_change(double time_offset)
 	return err;
 }
 
-int mozart_mulroom_run_ntpd(void)
+int module_mulroom_run_ntpd(void)
 {
 	char res_str[128] = {0};
 	FILE *res_ptr;

@@ -46,6 +46,9 @@
 #include <asm/arch/rtc.h>
 #include <asm/io.h>
 #endif
+#ifdef CONFIG_JS1_BOARD
+#include <asm/nvrw_interface.h>
+#endif
 #include <splash.h>
 
 #if defined(CONFIG_CPU_PXA25X) || defined(CONFIG_CPU_PXA27X) || \
@@ -624,8 +627,13 @@ void lcd_clear(void)
 		lcd_puts_xy(80,0,"updating");
 	}
 #elif defined CONFIG_JS1_BOARD
-	if (gpio_get_value(86))
-		jz_hibernate();
+	nvinfo_t *nvinfo = NULL;
+
+	nvinfo = get_nvinfo();
+	if((nvinfo->update_flag != FLAG_UPDATE) && (nvinfo->update_process != PROCESS_2)) {
+		if (gpio_get_value(86))
+			jz_hibernate();
+	}
 	lcd_console_address = lcd_logo();
 #else
 	lcd_console_address = lcd_logo();

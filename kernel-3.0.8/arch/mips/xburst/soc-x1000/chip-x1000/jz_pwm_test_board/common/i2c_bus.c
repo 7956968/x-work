@@ -60,6 +60,15 @@ static struct cw_bat_platform_data cw_bat_platdata = {
 };
 #endif
 
+#ifdef CONFIG_ES8374_EXTERNAL_CODEC
+static struct snd_board_gpio i2c_address_pin = {
+		.gpio = GPIO_ES8374_I2C_ADDRESS,
+		.active_level = LOW_ENABLE,
+};
+static struct es8374_platform_data es8374_data = {
+	.i2c_address = &i2c_address_pin,
+};
+#endif
 #if (defined(CONFIG_SOFT_I2C0_GPIO_V12_JZ) || defined(CONFIG_I2C0_V12_JZ))
 struct i2c_board_info jz_i2c0_devs[] __initdata = {
 #ifdef CONFIG_SENSORS_BMA2X2
@@ -73,6 +82,12 @@ struct i2c_board_info jz_i2c0_devs[] __initdata = {
 		I2C_BOARD_INFO("cw201x", 0x62),
 		.platform_data = &cw_bat_platdata,
 	},
+#endif
+#ifdef CONFIG_ES8374_EXTERNAL_CODEC
+		{
+				I2C_BOARD_INFO("es8374",0x10),
+				.platform_data = &es8374_data,
+		},
 #endif
 };
 int jz_i2c0_devs_size = ARRAY_SIZE(jz_i2c0_devs);

@@ -22,6 +22,10 @@ int main(int argc, char **argv)
 	mozart_lcd_display(NULL, SYSTME_BOOTING_CN);
 	system("echo 120 > /sys/devices/platform/pwm-backlight.0/backlight/pwm-backlight.0/brightness");
 #endif
+
+#if (SUPPORT_USB_AUDIO == 1)
+	mozart_ini_setkey("/usr/data/system.ini","usb_audio","use_usb_audio","0");
+#endif
 	while (count > 0) {
 		ret = mozart_play_key(keyword);
 		if (!ret)
@@ -29,7 +33,9 @@ int main(int argc, char **argv)
 		usleep(MSEC * 1000);
 		count--;
 	}
-
+#if (SUPPORT_USB_AUDIO == 1)
+	mozart_ini_setkey("/usr/data/system.ini","usb_audio","use_usb_audio","1");
+#endif
 	if (count <= 0)
 		printf("%s. Playing keyword \"%s\" connect timeout.\n", basename(argv[0]), keyword);
 

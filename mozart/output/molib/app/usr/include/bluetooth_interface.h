@@ -28,11 +28,9 @@
 #define BD_NAME_LEN			248
 #define DEV_CLASS_LEN			3
 #define BSA_EIR_DATA_LENGTH		HCI_EXT_INQ_RESPONSE_LEN
-#define BSA_HS_ORI_SAMPLE		0
 #define BLE_INCLUDED			TRUE
 #define DEVICE_FROM_DATABSASE 		0
 #define DEVICE_FROM_DISCOVERY		1
-
 
 typedef unsigned char   UINT8;
 typedef unsigned short  UINT16;
@@ -101,6 +99,13 @@ typedef UINT8 BT_OCTET8[BT_OCTET8_LEN];   /* octet array: size 16 */
 #define BTA_HH_PROTO_RPT_MODE                   (0x00)
 #define BTA_HH_PROTO_BOOT_MODE                  (0x01)
 #define BTA_HH_PROTO_UNKNOWN                    (0xff)
+/* ADV data flag bit definition used for BTM_BLE_AD_TYPE_FLAG */
+#define BSA_DM_BLE_LIMIT_DISC_FLAG         BTM_BLE_LIMIT_DISC_FLAG
+#define BSA_DM_BLE_GEN_DISC_FLAG           BTM_BLE_GEN_DISC_FLAG
+#define BSA_DM_BLE_BREDR_NOT_SPT           BTM_BLE_BREDR_NOT_SPT
+#define BSA_DM_BLE_NON_LIMIT_DISC_FLAG     BTM_BLE_NON_LIMIT_DISC_FLAG         /* lowest bit unset */
+#define BSA_DM_BLE_ADV_FLAG_MASK           BTM_BLE_ADV_FLAG_MASK
+#define BSA_DM_BLE_LIMIT_DISC_MASK         BTM_BLE_LIMIT_DISC_MASK
 
 #define BSA_DM_BLE_AD_DATA_LEN          31   /*BLE Advertisement data size limit, stack takes 31bytes of data */
 #define BSA_DM_BLE_AD_UUID_MAX          6   /*Max number of Service UUID the device can advertise*/
@@ -297,6 +302,7 @@ typedef struct
 					/*Otherwise, set preferred value for master*/
 } tBSA_DM_BLE_CONN_PARAM;
 
+
 enum {
 	BTA_GATTC_ATTR_TYPE_INCL_SRVC,
 	BTA_GATTC_ATTR_TYPE_CHAR,
@@ -375,8 +381,6 @@ typedef struct {
 	UINT8 uuid128[MAX_UUID_SIZE];
 } tBSA_DM_BLE_128SERVICE;
 
-
-
 /* BLE Advertisement configuration parameters */
 typedef struct {
 	UINT8                     len; /* Number of bytes of data to be advertised */
@@ -410,6 +414,7 @@ typedef tBTA_GATT_CHAR_PROP        tBSA_BLE_CHAR_PROP;
 typedef tBTA_GATT_TRANSPORT        tBSA_BLE_TRANSPORT;
 typedef tBTA_GATTC_WRITE_TYPE      tBSA_BLE_WRITE_TYPE;
 typedef tBTM_BLE_SEC_ACT           tBTA_DM_BLE_SEC_ACT;
+
 
 /* Attribute permissions
 */
@@ -937,6 +942,7 @@ typedef tBTA_SEC tBSA_SEC_AUTH;
 #define BSA_HL_SERVICE_MASK         BTA_HL_SERVICE_MASK          /* Health Profile Profile */
 #define BSA_BLE_SERVICE_MASK        BTA_BLE_SERVICE_MASK         /* GATT based service */
 
+#define BSA_ALL_SERVICE_MASK        (BTA_ALL_SERVICE_MASK & ~BTA_RES_SERVICE_MASK)  /* All services supported by BSA. */
 /*
  * Service ID
  *
@@ -1023,6 +1029,131 @@ typedef tBTA_SEC tBSA_SEC_AUTH;
 #endif
 #define BSA_MAX_SERVICE_ID          BTA_MAX_SERVICE_ID
 
+/* State flag for Passthrough commands
+*/
+#define AVRC_STATE_PRESS    0
+#define AVRC_STATE_RELEASE  1
+
+/* Operation ID list for Passthrough commands
+*/
+#define AVRC_ID_SELECT      0x00    /* select */
+#define AVRC_ID_UP          0x01    /* up */
+#define AVRC_ID_DOWN        0x02    /* down */
+#define AVRC_ID_LEFT        0x03    /* left */
+#define AVRC_ID_RIGHT       0x04    /* right */
+#define AVRC_ID_RIGHT_UP    0x05    /* right-up */
+#define AVRC_ID_RIGHT_DOWN  0x06    /* right-down */
+#define AVRC_ID_LEFT_UP     0x07    /* left-up */
+#define AVRC_ID_LEFT_DOWN   0x08    /* left-down */
+#define AVRC_ID_ROOT_MENU   0x09    /* root menu */
+#define AVRC_ID_SETUP_MENU  0x0A    /* setup menu */
+#define AVRC_ID_CONT_MENU   0x0B    /* contents menu */
+#define AVRC_ID_FAV_MENU    0x0C    /* favorite menu */
+#define AVRC_ID_EXIT        0x0D    /* exit */
+#define AVRC_ID_0           0x20    /* 0 */
+#define AVRC_ID_1           0x21    /* 1 */
+#define AVRC_ID_2           0x22    /* 2 */
+#define AVRC_ID_3           0x23    /* 3 */
+#define AVRC_ID_4           0x24    /* 4 */
+#define AVRC_ID_5           0x25    /* 5 */
+#define AVRC_ID_6           0x26    /* 6 */
+#define AVRC_ID_7           0x27    /* 7 */
+#define AVRC_ID_8           0x28    /* 8 */
+#define AVRC_ID_9           0x29    /* 9 */
+#define AVRC_ID_DOT         0x2A    /* dot */
+#define AVRC_ID_ENTER       0x2B    /* enter */
+#define AVRC_ID_CLEAR       0x2C    /* clear */
+#define AVRC_ID_CHAN_UP     0x30    /* channel up */
+#define AVRC_ID_CHAN_DOWN   0x31    /* channel down */
+#define AVRC_ID_PREV_CHAN   0x32    /* previous channel */
+#define AVRC_ID_SOUND_SEL   0x33    /* sound select */
+#define AVRC_ID_INPUT_SEL   0x34    /* input select */
+#define AVRC_ID_DISP_INFO   0x35    /* display information */
+#define AVRC_ID_HELP        0x36    /* help */
+#define AVRC_ID_PAGE_UP     0x37    /* page up */
+#define AVRC_ID_PAGE_DOWN   0x38    /* page down */
+#define AVRC_ID_POWER       0x40    /* power */
+#define AVRC_ID_VOL_UP      0x41    /* volume up */
+#define AVRC_ID_VOL_DOWN    0x42    /* volume down */
+#define AVRC_ID_MUTE        0x43    /* mute */
+#define AVRC_ID_PLAY        0x44    /* play */
+#define AVRC_ID_STOP        0x45    /* stop */
+#define AVRC_ID_PAUSE       0x46    /* pause */
+#define AVRC_ID_RECORD      0x47    /* record */
+#define AVRC_ID_REWIND      0x48    /* rewind */
+#define AVRC_ID_FAST_FOR    0x49    /* fast forward */
+#define AVRC_ID_EJECT       0x4A    /* eject */
+#define AVRC_ID_FORWARD     0x4B    /* forward */
+#define AVRC_ID_BACKWARD    0x4C    /* backward */
+#define AVRC_ID_ANGLE       0x50    /* angle */
+#define AVRC_ID_SUBPICT     0x51    /* subpicture */
+#define AVRC_ID_F1          0x71    /* F1 */
+#define AVRC_ID_F2          0x72    /* F2 */
+#define AVRC_ID_F3          0x73    /* F3 */
+#define AVRC_ID_F4          0x74    /* F4 */
+#define AVRC_ID_F5          0x75    /* F5 */
+#define AVRC_ID_VENDOR      0x7E    /* vendor unique */
+#define AVRC_KEYPRESSED_RELEASE 0x80
+
+/* operation id list for BSA_AvRemoteCmd */
+#define BSA_AV_RC_SELECT      AVRC_ID_SELECT      /* select */
+#define BSA_AV_RC_UP          AVRC_ID_UP          /* up */
+#define BSA_AV_RC_DOWN        AVRC_ID_DOWN        /* down */
+#define BSA_AV_RC_LEFT        AVRC_ID_LEFT        /* left */
+#define BSA_AV_RC_RIGHT       AVRC_ID_RIGHT       /* right */
+#define BSA_AV_RC_RIGHT_UP    AVRC_ID_RIGHT_UP    /* right-up */
+#define BSA_AV_RC_RIGHT_DOWN  AVRC_ID_RIGHT_DOWN  /* right-down */
+#define BSA_AV_RC_LEFT_UP     AVRC_ID_LEFT_UP     /* left-up */
+#define BSA_AV_RC_LEFT_DOWN   AVRC_ID_LEFT_DOWN   /* left-down */
+#define BSA_AV_RC_ROOT_MENU   AVRC_ID_ROOT_MENU   /* root menu */
+#define BSA_AV_RC_SETUP_MENU  AVRC_ID_SETUP_MENU  /* setup menu */
+#define BSA_AV_RC_CONT_MENU   AVRC_ID_CONT_MENU   /* contents menu */
+#define BSA_AV_RC_FAV_MENU    AVRC_ID_FAV_MENU    /* favorite menu */
+#define BSA_AV_RC_EXIT        AVRC_ID_EXIT        /* exit */
+#define BSA_AV_RC_0           AVRC_ID_0           /* 0 */
+#define BSA_AV_RC_1           AVRC_ID_1           /* 1 */
+#define BSA_AV_RC_2           AVRC_ID_2           /* 2 */
+#define BSA_AV_RC_3           AVRC_ID_3           /* 3 */
+#define BSA_AV_RC_4           AVRC_ID_4           /* 4 */
+#define BSA_AV_RC_5           AVRC_ID_5           /* 5 */
+#define BSA_AV_RC_6           AVRC_ID_6           /* 6 */
+#define BSA_AV_RC_7           AVRC_ID_7           /* 7 */
+#define BSA_AV_RC_8           AVRC_ID_8           /* 8 */
+#define BSA_AV_RC_9           AVRC_ID_9           /* 9 */
+#define BSA_AV_RC_DOT         AVRC_ID_DOT         /* dot */
+#define BSA_AV_RC_ENTER       AVRC_ID_ENTER       /* enter */
+#define BSA_AV_RC_CLEAR       AVRC_ID_CLEAR       /* clear */
+#define BSA_AV_RC_CHAN_UP     AVRC_ID_CHAN_UP     /* channel up */
+#define BSA_AV_RC_CHAN_DOWN   AVRC_ID_CHAN_DOWN   /* channel down */
+#define BSA_AV_RC_PREV_CHAN   AVRC_ID_PREV_CHAN   /* previous channel */
+#define BSA_AV_RC_SOUND_SEL   AVRC_ID_SOUND_SEL   /* sound select */
+#define BSA_AV_RC_INPUT_SEL   AVRC_ID_INPUT_SEL   /* input select */
+#define BSA_AV_RC_DISP_INFO   AVRC_ID_DISP_INFO   /* display information */
+#define BSA_AV_RC_HELP        AVRC_ID_HELP        /* help */
+#define BSA_AV_RC_PAGE_UP     AVRC_ID_PAGE_UP     /* page up */
+#define BSA_AV_RC_PAGE_DOWN   AVRC_ID_PAGE_DOWN   /* page down */
+#define BSA_AV_RC_POWER       AVRC_ID_POWER       /* power */
+#define BSA_AV_RC_VOL_UP      AVRC_ID_VOL_UP      /* volume up */
+#define BSA_AV_RC_VOL_DOWN    AVRC_ID_VOL_DOWN    /* volume down */
+#define BSA_AV_RC_MUTE        AVRC_ID_MUTE        /* mute */
+#define BSA_AV_RC_PLAY        AVRC_ID_PLAY        /* play */
+#define BSA_AV_RC_STOP        AVRC_ID_STOP        /* stop */
+#define BSA_AV_RC_PAUSE       AVRC_ID_PAUSE       /* pause */
+#define BSA_AV_RC_RECORD      AVRC_ID_RECORD      /* record */
+#define BSA_AV_RC_REWIND      AVRC_ID_REWIND      /* rewind */
+#define BSA_AV_RC_FAST_FOR    AVRC_ID_FAST_FOR    /* fast forward */
+#define BSA_AV_RC_EJECT       AVRC_ID_EJECT       /* eject */
+#define BSA_AV_RC_FORWARD     AVRC_ID_FORWARD     /* forward */
+#define BSA_AV_RC_BACKWARD    AVRC_ID_BACKWARD    /* backward */
+#define BSA_AV_RC_ANGLE       AVRC_ID_ANGLE       /* angle */
+#define BSA_AV_RC_SUBPICT     AVRC_ID_SUBPICT     /* subpicture */
+#define BSA_AV_RC_F1          AVRC_ID_F1          /* F1 */
+#define BSA_AV_RC_F2          AVRC_ID_F2          /* F2 */
+#define BSA_AV_RC_F3          AVRC_ID_F3          /* F3 */
+#define BSA_AV_RC_F4          AVRC_ID_F4          /* F4 */
+#define BSA_AV_RC_F5          AVRC_ID_F5          /* F5 */
+#define BSA_AV_RC_VENDOR      AVRC_ID_VENDOR      /* vendor unique */
+
 typedef struct {
 	char *ops_push_dir; /* opc push file to ops dir */
 	char *ops_pull_file; /* opc pull file from ops_file */
@@ -1072,6 +1203,7 @@ typedef enum {
 	BT_LINK_DISCONNECTED,
 	BT_LINK_CONNECTING,
 	BT_LINK_CONNECTED,
+	BT_LINK_CONNECT_FAILED,
 } bsa_link_status;
 
 typedef enum {
@@ -1219,63 +1351,6 @@ typedef struct
 typedef tAVRC_GET_PLAY_STATUS_RSP   tBSA_AVK_GET_PLAY_STATUS_MSG;
 
 typedef void (tBSA_DISC_CBACK)(tBSA_DISC_EVT event, tBSA_DISC_MSG *p_data);
-typedef unsigned int (*aec_func_t)(void);
-typedef void (*aec_calculate_t)(void *buf_mic, void *buf_ref, void *buf_result, unsigned int size);
-
-typedef struct {
-	char *in_buffer;
-	char *out_buffer;
-	unsigned int in_len;
-	unsigned int out_len;
-} bt_aec_resample_msg;
-
-typedef void (*bt_aec_resample_t)(bt_aec_resample_msg *bt_aec_rmsg);
-
-typedef struct {
-	char *in_buffer;
-	char *out_buffer;
-	unsigned int in_len;
-	unsigned int out_len;
-} hs_resample_msg;
-
-typedef void (*hs_resample_t)(hs_resample_msg *hs_msg);
-
-typedef struct bt_aec_callback_interface {
-	aec_func_t aec_enable;
-	aec_func_t aec_get_buffer_length;
-	aec_calculate_t aec_calculate;
-	aec_func_t aec_init;
-	aec_func_t aec_destroy;
-} bt_aec_callback;
-
-typedef struct {
-	int sample_rate;
-	int sample_channel;
-	int sample_bits;
-} hs_sample_init_data;
-
-typedef struct {
-	int sample_rate;
-	int sample_channel;
-	int sample_bits;
-} bt_aec_sample_init_data;
-
-typedef struct {
-	int resample_rate;
-	int resample_channel;
-	int resample_bits;
-	int resample_enable;
-	int resample_time;
-	bt_aec_resample_t aec_resample_data_cback;
-} bt_aec_resample_init_data;
-
-typedef struct {
-	int resample_rate;
-	int resample_channel;
-	int resample_bits;
-	int resample_enable;
-	hs_resample_t mozart_hs_resample_data_cback;
-} hs_resample_init_data;
 
 typedef struct {
 	char	*in_buffer;
@@ -1318,6 +1393,7 @@ typedef struct bsa_ble_create_service_data {
 } ble_create_service_data;
 
 typedef struct bsa_ble_server_indication {
+	int conn_id;
 	int server_num;
 	int attr_num;
 	int length_of_data;
@@ -1338,7 +1414,13 @@ typedef struct bsa_ble_add_character_data {
 	int attribute_permission;
 	int characteristic_property;
 	UINT16	char_uuid;
-} ble_add_char_data;
+} ble_char_data;
+
+#define NOTIFY_CONN_MAX_NUM  20
+typedef struct bsa_ble_character_notify_data {
+	ble_char_data char_data;
+	int conn_id[NOTIFY_CONN_MAX_NUM];
+} ble_char_notify;
 
 typedef struct {
 	UINT16 service_uuid;	/* Enter Service UUID to read(eg. x1800) */
@@ -1382,6 +1464,44 @@ typedef struct {
 	int char_inst_id;
 	int is_primary;
 } BLE_CL_NOTIFREG;
+
+typedef struct
+{
+	tBT_UUID       attr_UUID;
+	UINT16         service_id;
+	UINT16         attr_id;
+	UINT8          attr_type;
+	UINT8          prop;
+	BOOLEAN        is_pri;
+	BOOLEAN        wait_flag;
+	UINT8          value[BSA_BLE_MAX_ATTR_LEN];
+	UINT16         value_len;
+} tAPP_BLE_ATTRIBUTE;
+
+typedef struct
+{
+	tBT_UUID        service_UUID;
+	BOOLEAN         enabled;
+	tBSA_BLE_IF     client_if;
+	UINT16          conn_id;
+	BD_ADDR         server_addr;
+	BOOLEAN         write_pending;
+	BOOLEAN         read_pending;
+} tAPP_BLE_CLIENT;
+
+typedef struct
+{
+	BOOLEAN             enabled;
+	tBSA_BLE_IF         server_if;
+	UINT16              conn_id;
+	tAPP_BLE_ATTRIBUTE  attr[BSA_BLE_ATTRIBUTE_MAX];
+} tAPP_BLE_SERVER;
+
+typedef struct
+{
+	tAPP_BLE_CLIENT ble_client[BSA_BLE_CLIENT_MAX];
+	tAPP_BLE_SERVER ble_server[BSA_BLE_SERVER_MAX];
+} tAPP_BLE_CB;
 
 typedef enum
 {
@@ -1672,11 +1792,10 @@ typedef union
 } tBSA_BLE_MSG;
 
 typedef int (*bt_ble_func_t)(tBSA_BLE_EVT event, tBSA_BLE_MSG *p_data);
-typedef int (*ble_server_write_func_t)(tBSA_BLE_SE_WRITE_MSG  * ble_ser_write, UINT16 char_uuid);
 
 typedef struct {
-	bt_ble_func_t ble_common_profile_cback;
-	ble_server_write_func_t ble_ser_write_cback;
+	bt_ble_func_t ble_client_profile_cback;
+	bt_ble_func_t ble_server_profile_cback;
 } bt_ble_callback;
 
 typedef enum {
@@ -1765,6 +1884,26 @@ typedef struct {
 	UINT8  bit_per_sample;  /* Number of bits per sample (8, 16) */
 } tBSA_AV_MEDIA_FEED_CFG_PCM;
 
+enum RC_COMMANDS
+{
+	APP_AV_IDLE,
+	APP_AV_START,
+	APP_AV_STOP,
+	APP_AV_PAUSE,
+	APP_AV_FORWARD,
+	APP_AV_BACKWARD,
+	APP_AV_VOL_UP,
+	APP_AV_VOL_DOWN
+};
+
+/* Play states */
+enum
+{
+	APP_AV_PLAY_STOPPED,
+	APP_AV_PLAY_STARTED,
+	APP_AV_PLAY_PAUSED,
+	APP_AV_PLAY_STOPPING
+};
 #define BTA_SERVICE_NAME_LEN    35
 #define BSA_SERVICE_NAME_LEN BTA_SERVICE_NAME_LEN
 
@@ -1790,6 +1929,7 @@ typedef struct {
 	int connect_type;
 	int device_index;
 	int uuid[16];
+	BOOLEAN is_128uuid;
 	tBSA_DG_OPEN param;
 } dg_open_paramters;
 
@@ -1887,6 +2027,19 @@ extern tAPP_XML_REM_DEVICE *mozart_bluetooth_read_remote_device_info();
 
 /*******************************************************************************
  **
+ ** Function         mozart_bluetooth_unpair_remote_device
+ **
+ ** Description      Unpair a remote device, delete device info from bt_devices.xml
+ **
+ ** Parameters
+ **
+ ** Returns          0 if success / -1 if error
+ **
+ *******************************************************************************/
+extern int mozart_bluetooth_unpair_remote_device(BD_ADDR *addr);
+
+/*******************************************************************************
+ **
  ** Function         mozart_bluetooth_set_link_status
  **
  ** Description      Bluetooth set current link status
@@ -1963,7 +2116,7 @@ extern int mozart_bluetooth_parse_eir_manuf_specific(UINT8 *p_eir, bsa_manu_data
  ** Returns          0 is ok, other is failed
  **
  *******************************************************************************/
-extern int mozart_bluetooth_disc_start_regular(void);
+extern int mozart_bluetooth_disc_start_regular(int duration);
 
 /*******************************************************************************
  **
@@ -1982,10 +2135,13 @@ extern int mozart_bluetooth_disc_stop_regular(void);
  **
  ** Description      Start Device services discovery
  **
+ ** Parameters      services: Search for specific services supported by the Device
+ **		    duration: Multiple of 1.28 seconds
+ **
  ** Returns          status: 0 if success / -1 otherwise
  **
  *******************************************************************************/
-extern int mozart_bluetooth_disc_start_services(tBSA_SERVICE_MASK services);
+extern int mozart_bluetooth_disc_start_services(tBSA_SERVICE_MASK services, int duration);
 
 /*******************************************************************************
 **
@@ -2181,32 +2337,6 @@ extern int mozart_blutooth_hs_set_volume(tBSA_BTHF_VOLUME_TYPE_T type, int volum
 
 /*******************************************************************************
  **
- ** Function         mozart_hs_get_default_sampledata
- **
- ** Description      mozart get hs default sample data
- **
- ** Parameters       struct hs_sample_init_data
- **
- ** Returns          void
- **
- *******************************************************************************/
-extern void mozart_hs_get_default_sampledata(hs_sample_init_data *sample_data);
-
-/*******************************************************************************
- **
- ** Function         mozart_bluetooth_hs_set_resampledata_callback
- **
- ** Description      mozart set hs resample_data to bsa, bsa set resample_data to codec controler.
- **
- ** Parameters       struct hs_resample_init_data
- **
- ** Returns          void
- **
- *******************************************************************************/
-extern void mozart_bluetooth_hs_set_resampledata_callback(hs_resample_init_data *resample_data);
-
-/*******************************************************************************
- **
  ** Function         mozart_bluetooth_hs_send_battery_level
  **
  ** Description      Send bt battery_value to phone device
@@ -2219,6 +2349,134 @@ extern void mozart_bluetooth_hs_set_resampledata_callback(hs_resample_init_data 
  *******************************************************************************/
 extern int mozart_bluetooth_hs_send_battery_level(unsigned int battery_value);
 
+/* HS callback events */
+#define BTA_HS_ENABLE_EVT           0  /* HS enabled */
+#define BTA_HS_DISABLE_EVT          1  /* HS Disabled */
+#define BTA_HS_REGISTER_EVT         2  /* HS Registered */
+#define BTA_HS_DEREGISTER_EVT       3  /* HS Registered */
+#define BTA_HS_OPEN_EVT             4 /* HS connection open or connection attempt failed  */
+#define BTA_HS_CLOSE_EVT            5 /* HS connection closed */
+#define BTA_HS_CONN_EVT             6 /* HS Service Level Connection is UP */
+#define BTA_HS_CONN_LOSS_EVT        7 /* Link loss of connection to audio gateway happened */
+#define BTA_HS_AUDIO_OPEN_REQ_EVT   8 /* Audio open request*/
+#define BTA_HS_AUDIO_OPEN_EVT       9 /* Audio connection open */
+#define BTA_HS_AUDIO_CLOSE_EVT      10/* Audio connection closed */
+#define BTA_HS_CIND_EVT             11/* Indicator string from AG */
+#define BTA_HS_CIEV_EVT             12/* Indicator status from AG */
+#define BTA_HS_RING_EVT             13/* RING alert from AG */
+#define BTA_HS_CLIP_EVT             14/* Calling subscriber information from AG */
+#define BTA_HS_BSIR_EVT             15/* In band ring tone setting */
+#define BTA_HS_BVRA_EVT             16/* Voice recognition activation/deactivation */
+#define BTA_HS_CCWA_EVT             17/* Call waiting notification */
+#define BTA_HS_CHLD_EVT             18/* Call hold and multi party service in AG */
+#define BTA_HS_VGM_EVT              19/* MIC volume setting */
+#define BTA_HS_VGS_EVT              20/* Speaker volume setting */
+#define BTA_HS_BINP_EVT             21/* Input data response from AG */
+#define BTA_HS_BTRH_EVT             22/* CCAP incoming call hold */
+#define BTA_HS_CNUM_EVT             23/* Subscriber number */
+#define BTA_HS_COPS_EVT		        24/* Operator selection info from AG */
+#define BTA_HS_CMEE_EVT		        25/* Enhanced error result from AG */
+#define BTA_HS_CLCC_EVT             26/* Current active call list info */
+#define BTA_HS_UNAT_EVT             27/* AT command response fro AG which is not specified in HFP or HSP */
+#define BTA_HS_OK_EVT               28 /* OK response */
+#define BTA_HS_ERROR_EVT            29 /* ERROR response */
+#define BTA_HS_BCS_EVT              30 /* Codec selection from AG */
+
+/* BSA HS callback events */
+typedef enum
+{
+	BSA_HS_OPEN_EVT,                    /* HS connection open or connection attempt failed  */
+	BSA_HS_CLOSE_EVT,                   /* HS connection closed */
+	BSA_HS_CONN_EVT,                    /* HS Service Level Connection is UP */
+	BSA_HS_CONN_LOSS_EVT,               /* Link loss of connection to audio gateway happened */
+	BSA_HS_AUDIO_OPEN_REQ_EVT,          /* Audio open request*/
+	BSA_HS_AUDIO_OPEN_EVT,              /* Audio connection open */
+	BSA_HS_AUDIO_CLOSE_EVT,             /* Audio connection closed */
+
+	BSA_HS_CIND_EVT  = BTA_HS_CIND_EVT, /* Indicator string from AG */
+	BSA_HS_CIEV_EVT  = BTA_HS_CIEV_EVT, /* Indicator status from AG */
+	BSA_HS_RING_EVT  = BTA_HS_RING_EVT, /* RING alert from AG */
+	BSA_HS_CLIP_EVT  = BTA_HS_CLIP_EVT, /* Calling subscriber information from AG */
+	BSA_HS_BSIR_EVT  = BTA_HS_BSIR_EVT, /* In band ring tone setting */
+	BSA_HS_BVRA_EVT  = BTA_HS_BVRA_EVT, /* Voice recognition activation/deactivation */
+	BSA_HS_CCWA_EVT  = BTA_HS_CCWA_EVT, /* Call waiting notification */
+	BSA_HS_CHLD_EVT  = BTA_HS_CHLD_EVT, /* Call hold and multi party service in AG */
+	BSA_HS_VGM_EVT   = BTA_HS_VGM_EVT,  /* MIC volume setting */
+	BSA_HS_VGS_EVT   = BTA_HS_VGS_EVT,  /* Speaker volume setting */
+	BSA_HS_BINP_EVT  = BTA_HS_BINP_EVT, /* Input data response from AG */
+	BSA_HS_BTRH_EVT  = BTA_HS_BTRH_EVT, /* CCAP incoming call hold */
+	BSA_HS_CNUM_EVT  = BTA_HS_CNUM_EVT, /* Subscriber number */
+	BSA_HS_COPS_EVT  = BTA_HS_COPS_EVT, /* Operator selection info from AG */
+	BSA_HS_CMEE_EVT  = BTA_HS_CMEE_EVT, /* Enhanced error result from AG */
+	BSA_HS_CLCC_EVT  = BTA_HS_CLCC_EVT, /* Current active call list info */
+	BSA_HS_UNAT_EVT  = BTA_HS_UNAT_EVT, /* AT command response fro AG which is not specified in HFP or HSP */
+	BSA_HS_OK_EVT    = BTA_HS_OK_EVT,   /* OK response */
+	BSA_HS_ERROR_EVT = BTA_HS_ERROR_EVT,/* ERROR response */
+	BSA_HS_BCS_EVT   = BTA_HS_BCS_EVT,  /* Codec selection from AG */
+} tBSA_HS_EVT;
+
+typedef struct {
+	UINT32 rate;
+	UINT32 channel;
+	UINT32 bits;
+} hs_sample_info;
+
+typedef struct {
+	hs_sample_info hope;
+	hs_sample_info actual;
+	UINT32 volume;
+} hs_sample_param;
+
+typedef struct {
+	char	*ibuf;
+	char	*obuf;
+	UINT32	ilen;
+	UINT32	olen;
+} hs_stream_in_info;
+
+typedef struct {
+	char	*ref_buf;
+	char	*record_buf;
+	char	*out_buf;
+	UINT32	ref_len;
+	UINT32	record_len;
+	UINT32	out_len;
+} hs_stream_out_info;
+
+typedef struct {
+	hs_stream_in_info  in;
+	hs_stream_out_info out;
+	hs_sample_param	ref;
+	hs_sample_param	record;
+	hs_sample_param	aec;
+	hs_sample_param	hs;
+	hs_sample_param	dsp;
+	UINT32 sample_time;	/* ms */
+} hs_stream_msg;
+
+typedef struct {
+	int  dsp_r_fd;
+	int  dsp_w_fd;
+	int  bt_r_fd;
+	int  bt_w_fd;
+	int  record_r_fd;
+
+	int  write_bt_call;
+	int  read_bt_call;
+	int  write_codec_call;
+	int  read_dmic_call;
+	hs_stream_msg hs_msg;
+} device_prope;
+
+typedef int (*hs_evt_cback_t)(tBSA_HS_EVT event, void *p_data);
+typedef int (*hs_data_cback_t)(hs_stream_msg *hs_msg);
+typedef struct {
+	hs_evt_cback_t  mozart_hs_evt_cback;
+	hs_data_cback_t mozart_hs_data_in_cback;
+	hs_data_cback_t mozart_hs_data_out_cback;
+} hs_cback_init_data;
+
+extern void mozart_bluetooth_hs_init_callback(hs_cback_init_data *cback_data);
 
 /******************************** AVK Servie Interface ***********************************/
 
@@ -2276,19 +2534,6 @@ extern void mozart_bluetooth_avk_stop_play(void);
 
 /*******************************************************************************
  **
- ** Function         mozart_bluetooth_avk_pause_play
- **
- ** Description      Bluetooth pause the current play
- **
- ** Parameters	     void
- **
- ** Returns          void
- **
- *******************************************************************************/
-extern void mozart_bluetooth_avk_pause_play(void);
-
-/*******************************************************************************
- **
  ** Function         mozart_bluetooth_avk_play_pause
  **
  ** Description      Bluetooth execute play and pause command switch Automatically
@@ -2302,12 +2547,33 @@ extern void mozart_bluetooth_avk_play_pause(void);
 
 /*******************************************************************************
  **
+ ** Function         mozart_bluetooth_avk_play
+ **
+ ** Description      Bluetooth execute play command
+ **
+ ** Parameters	     void
+ **
+ *******************************************************************************/
+extern void mozart_bluetooth_avk_play(void);
+
+/*******************************************************************************
+ **
+ ** Function         mozart_bluetooth_avk_pause
+ **
+ ** Description      Bluetooth execute pause command
+ **
+ ** Parameters	     void
+ **
+ *******************************************************************************/
+extern void mozart_bluetooth_avk_pause(void);
+
+/*******************************************************************************
+ **
  ** Function         mozart_bluetooth_avk_next_music
  **
  ** Description      Bluetooth play the next music
  **
  ** Parameters	     void
- ** Returns          void
  **
  *******************************************************************************/
 extern void mozart_bluetooth_avk_next_music(void);
@@ -2319,7 +2585,6 @@ extern void mozart_bluetooth_avk_next_music(void);
  ** Description      Bluetooth play the previous music
  **
  ** Parameters	     void
- ** Returns          void
  **
  *******************************************************************************/
 extern void mozart_bluetooth_avk_prev_music(void);
@@ -2339,29 +2604,14 @@ extern int mozart_bluetooth_avk_get_play_state(void);
 
 /*******************************************************************************
  **
- ** Function         mozart_bluetooth_avk_set_volume_up
+ ** Function         mozart_bluetooth_avk_set_volume
  **
- ** Description      This function sends absolute volume up
+ ** Description      This function sends absolute volume
  **
  ** Paraneters       volume: 0~0x7F
  **
- ** Returns          None
- **
  *******************************************************************************/
-extern void mozart_bluetooth_avk_set_volume_up(UINT8 volume);
-
-/*******************************************************************************
- **
- ** Function         mozart_bluetooth_avk_set_volume_down
- **
- ** Description      This function sends absolute volume down
- **
- ** Parameters       volume: 0~0x7F
- **
- ** Returns          None
- **
- *******************************************************************************/
-extern void mozart_bluetooth_avk_set_volume_down(UINT8 volume);
+extern void mozart_bluetooth_avk_set_volume(UINT8 volume);
 
 /*******************************************************************************
  **
@@ -2389,58 +2639,16 @@ extern int mozart_bluetooth_avk_close();
 
 /*******************************************************************************
  **
- ** Function         mozart_bluetooth_avk_set_resampledata_callback
+ ** Function         mozart_bluetooth_avk_init_callback
  **
- ** Description      Set AVK resample_data cback
+ ** Description
  **
- ** Parameters       avk_resample_init_data
- **
- ** Returns          void
- **
- *******************************************************************************/
-extern void mozart_bluetooth_avk_int_callback(avk_cback_init_data *cback_data);
-
-
-/********************************** AEC Interface ****************************************/
-
-/*******************************************************************************
- **
- ** Function         mozart_aec_callback
- **
- ** Description      Bluetooth eliminate echo callback
- **
- ** Parameters       bt_aec_callback struct
+ ** Parameters       avk_cback_init_data
  **
  ** Returns          void
  **
  *******************************************************************************/
-extern void mozart_aec_callback(bt_aec_callback *bt_ac);
-
-/*******************************************************************************
- **
- ** Function         mozart_aec_get_bt_default_sampledata
- **
- ** Description      AEC get Bluetooth default sample_data
- **
- ** Parameters       bt_aec_sample_init_data
- **
- ** Returns          void
- **
- *******************************************************************************/
-extern void mozart_aec_get_bt_default_sampledata(bt_aec_sample_init_data *sample_data);
-
-/*******************************************************************************
- **
- ** Function         mozart_aec_set_bt_resampledata_callback
- **
- ** Description      Bluetooth eliminate echo callback
- **
- ** Parameters       bt_aec_resample_init_data
- **
- ** Returns          void
- **
- *******************************************************************************/
-extern void mozart_aec_set_bt_resampledata_callback(bt_aec_resample_init_data *resample_data);
+extern void mozart_bluetooth_avk_init_callback(avk_cback_init_data *cback_data);
 
 
 /********************************** OPP Interface ****************************************/
@@ -2613,7 +2821,7 @@ extern int mozart_bluetooth_ble_set_visibility(BOOLEAN discoverable, BOOLEAN con
  ** Returns          0 if success, -1 if failed
  **
  *******************************************************************************/
-extern int mozart_bluetooth_ble_start_regular();
+extern int mozart_bluetooth_ble_start_regular(int duration);
 
 /*******************************************************************************
  **
@@ -2653,6 +2861,15 @@ extern int mozart_bluetooth_ble_set_adv_param(tBSA_DM_BLE_ADV_PARAM *p_req);
  **
  *******************************************************************************/
 extern int mozart_bluetooth_ble_set_conn_param(tBSA_DM_BLE_CONN_PARAM *p_req);
+
+/*******************************************************************************
+ **
+ ** Function        mozart_bluetooth_ble_get_cb
+ **
+ ** Description     get global struct app_ble_cb
+ **
+ *******************************************************************************/
+extern tAPP_BLE_CB *mozart_bluetooth_ble_get_cb();
 
 /*
  * BLE Server functions
@@ -2720,7 +2937,7 @@ extern int mozart_bluetooth_ble_server_start_service(ble_start_service_data *ble
  ** Returns         status: 0 if success / -1 otherwise
  **
  *******************************************************************************/
-extern int mozart_bluetooth_ble_server_add_character(ble_add_char_data *ble_add_char_data);
+extern int mozart_bluetooth_ble_server_add_character(ble_char_data *ble_char_data);
 
 /*******************************************************************************
  **
@@ -2759,19 +2976,6 @@ extern int mozart_bluetooth_ble_server_send_indication(ble_server_indication *bl
  ** Returns          0 if service enabled, -1 if service not enabled
  *******************************************************************************/
 extern int mozart_bluetooth_server_set_char_value(int server_num, int character_num, UINT8 *value, int vaule_num);
-
-/*******************************************************************************
- **
- ** Function         mozart_bluetooth_server_get_char_value
- **
- ** Description      Get BLE character value
- **
- ** Parameter        server_num: service num. character_num: character num. value: character value.
- **
- ** Returns          character value length if service enabled, -1 if service not enabled
- *******************************************************************************/
-extern int mozart_bluetooth_server_get_char_value(int server_num, int character_num, UINT8 *value);
-
 
 /* ---------------- ble client ------------------------------- */
 
@@ -3047,6 +3251,30 @@ extern int mozart_bluetooth_av_open(av_open_param *av_param);
 
 /*******************************************************************************
  **
+ ** Function         mozart_bluetooth_av_open_by_addr
+ **
+ ** Description      Function to open AV connection
+ **
+ ** Parameters       BD_ADDR of the deivce to connect
+ **
+ ** Returns          0 if successful, error code otherwise
+ **
+ *******************************************************************************/
+extern int mozart_bluetooth_av_open_by_addr(BD_ADDR *addr);
+
+/*******************************************************************************
+ **
+ ** Function         mozart_bluetooth_av_close
+ **
+ ** Description      Function to close AV connection
+ **
+ ** Returns          0 if successful, error code otherwise
+ **
+ *******************************************************************************/
+extern int mozart_bluetooth_av_close();
+
+/*******************************************************************************
+ **
  ** Function         mozart_bluetooth_av_play_playlist
  **
  ** Description      Example of start to play a play list
@@ -3102,6 +3330,19 @@ extern int mozart_bluetooth_av_rc_send_abs_vol_command(int volume);
 
 /*******************************************************************************
  **
+ ** Function         mozart_bluetooth_av_rc_send_commond
+ **
+ ** Description      Example of Send a RemoteControl command
+ **
+ ** Parameters	     BSA_AV_RC_XX
+ **
+ ** Returns          0 if successful, error code otherwise
+ **
+ *******************************************************************************/
+extern int mozart_bluetooth_av_rc_send_commond(int command);
+
+/*******************************************************************************
+ **
  ** Function         mozart_bluetooth_av_start_stream
  **
  ** Description      Start playing current stream
@@ -3132,6 +3373,35 @@ extern int mozart_bluetooth_av_stop_stream();
  **
  *******************************************************************************/
 extern int mozart_bluetooth_av_send_stream(void *audio_buf, int length);
+
+/*******************************************************************************
+ **
+ ** Function         mozart_bluetooth_av_get_play_state
+ **
+ ** Description      get av current play state
+ **
+ *******************************************************************************/
+extern int mozart_bluetooth_av_get_play_state();
+
+/*******************************************************************************
+ **
+ ** Function         mozart_bluetooth_av_set_busy_level
+ **
+ ** Description      Change busy level
+ **
+ ** Returns          0 if successful, error code otherwise
+ **
+ *******************************************************************************/
+extern int mozart_bluetooth_av_set_busy_level(UINT8 level);
+
+/*******************************************************************************
+ **
+ ** Function         mozart_bluetooth_av_get_cur_connected_device
+ **
+ ** Description      get av current connected devices info
+ **
+ *******************************************************************************/
+extern tAPP_XML_REM_DEVICE *mozart_bluetooth_av_get_cur_connected_device();
 
 /*******************************************************************************
  **
@@ -3213,14 +3483,16 @@ extern int mozart_bluetooth_dg_send_file(char *file_name);
 
 /*******************************************************************************
  **
- ** Function         mozart_bluetooth_dg_send_data
+ ** Function         mozart_bluetooth_dg_send
  **
  ** Description      Example of function to send data
+ **
+ ** Parameters	     connection: default 0
  **
  ** Returns          status: -1 in case of error, 0 if successful
  **
  *******************************************************************************/
-extern int mozart_bluetooth_dg_send_data(char *buf);
+extern int mozart_bluetooth_dg_send(int connection, char *data, int data_len);
 
 extern int mozart_bluetooth_dg_callback(bt_dg_func_t cback);
 

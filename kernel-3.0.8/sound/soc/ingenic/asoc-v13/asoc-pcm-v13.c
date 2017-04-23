@@ -24,6 +24,7 @@
 #include <sound/soc.h>
 #include <sound/soc-dai.h>
 #include <linux/slab.h>
+#include <linux/soundcard.h>
 #include "asoc-pcm-v13.h"
 
 static int jz_pcm_debug = 0;
@@ -34,9 +35,23 @@ module_param(jz_pcm_debug, int, 0644);
 			printk(KERN_DEBUG"PCM: " msg);	\
 	} while(0)
 
+static struct pcm_conf_info pcm_conf_info = {
+		.pcm_sync_clk   = 8000,
+		.pcm_clk        = 256000,
+		.pcm_sysclk     = 0,
+		.iss = AFMT_S16_LE,
+		.oss = AFMT_S16_LE,
+		.pcm_device_mode = PCM_SLAVE,
+		.pcm_imsb_pos = ONE_SHIFT_MODE,
+		.pcm_omsb_pos = ONE_SHIFT_MODE,
+		.pcm_sync_len = 1,
+		.pcm_slot_num = 1,
+};
+
 #define PCM_RFIFO_DEPTH 16
 #define PCM_TFIFO_DEPTH 16
-#define JZ_PCM_FORMATS (SNDRV_PCM_FMTBIT_S8 |  SNDRV_PCM_FMTBIT_S16_LE)
+#define JZ_PCM_FORMATS (SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_S16_LE)
+#define JZ_PCM_RATES   (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000)
 
 static void dump_registers(struct device *dev)
 {
@@ -60,21 +75,9 @@ static int jz_pcm_startup(struct snd_pcm_substream *substream,
 			(substream->stream == SNDRV_PCM_STREAM_PLAYBACK) ? "playback" : "capture");
 
 	if (!jz_pcm->pcm_mode) {
-		clk_enable(jz_pcm->clk_gate);
-#if 1
-		__pcm_as_slaver(dev);
-#else
-		clk_set_rate(jz_pcm->clk, 9600000);
-		clk_enable(jz_pcm->clk);
-		__pcm_as_master(dev);
-		__pcm_set_clkdiv(dev, 9600000/20/8000 - 1);
-		__pcm_set_syndiv(dev, 20 - 1);
-#endif
-		__pcm_set_msb_one_shift_in(dev);
-		__pcm_set_msb_one_shift_out(dev);
-		__pcm_play_lastsample(dev);
 		__pcm_enable(dev);
 		__pcm_clock_enable(dev);
+		__pcm_flush_fifo(dev);
 	}
 
 	if (substream->stream ==
@@ -82,6 +85,8 @@ static int jz_pcm_startup(struct snd_pcm_substream *substream,
 		__pcm_disable_transmit_dma(dev);
 		__pcm_disable_replay(dev);
 		__pcm_clear_tur(dev);
+		/* Just for anti pop if underrun happened when replaying */
+		__pcm_play_lastsample(dev);
 		jz_pcm->pcm_mode |= PCM_WRITE;
 	} else {
 		__pcm_disable_receive_dma(dev);
@@ -89,7 +94,6 @@ static int jz_pcm_startup(struct snd_pcm_substream *substream,
 		__pcm_clear_ror(dev);
 		jz_pcm->pcm_mode |= PCM_READ;
 	}
-	printk("start set PCM register....\n");
 	return 0;
 }
 
@@ -108,7 +112,7 @@ static int jz_pcm_hw_params(struct snd_pcm_substream *substream,
 
 	if (!((1 << params_format(params)) & JZ_PCM_FORMATS) ||
 			params_channels(params) != 1 ||
-			params_rate(params) != 8000) {
+			((params_rate(params) != 8000) && (params_rate(params) != 16000))) {
 		dev_err(dai->dev, "hw params not inval channel %d params %x\n",
 				params_channels(params), params_format(params));
 		return -EINVAL;
@@ -167,21 +171,12 @@ static void jz_pcm_stop_substream(struct snd_pcm_substream *substream,
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		if (__pcm_transmit_dma_is_enable(dev)) {
 			__pcm_disable_transmit_dma(dev);
-			__pcm_clear_tur(dev);
-			/* Hrtimer mode: stop will be happen in any where, make sure there is
-			 *	no data transfer on ahb bus before stop dma
-			 * Harzard:
-			 *	In pcm slave mode, the clk maybe stop before here, we will dead here
-			 */
-			while(!__pcm_test_tur(dev));
 		}
 		__pcm_disable_replay(dev);
 		__pcm_clear_tur(dev);
 	} else {
 		if (__pcm_receive_dma_is_enable(dev)) {
 			__pcm_disable_receive_dma(dev);
-			__pcm_clear_ror(dev);
-			while(!__pcm_test_ror(dev));
 		}
 		__pcm_disable_record(dev);
 		__pcm_clear_ror(dev);
@@ -223,33 +218,76 @@ static int jz_pcm_trigger(struct snd_pcm_substream *substream, int cmd, struct s
 }
 
 static void jz_pcm_shutdown(struct snd_pcm_substream *substream,
-		struct snd_soc_dai *dai) {
-	struct jz_pcm *jz_pcm = dev_get_drvdata(dai->dev);
+		struct snd_soc_dai *dai)
+{
 	struct device *dev = dai->dev;
+	struct jz_pcm *jz_pcm = dev_get_drvdata(dai->dev);
 
 	PCM_DEBUG_MSG("enter %s, substream = %s\n",
 			__func__,
 			(substream->stream == SNDRV_PCM_STREAM_PLAYBACK) ? "playback" : "capture");
 	jz_pcm_stop_substream(substream, dai);
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK){
+		__pcm_play_zero(dev);
 		jz_pcm->pcm_mode &= ~PCM_WRITE;
-	else
+	} else {
 		jz_pcm->pcm_mode &= ~PCM_READ;
+	}
 
 	if (!jz_pcm->pcm_mode) {
 		__pcm_disable(dev);
 		__pcm_clock_disable(dev);
-		clk_disable(jz_pcm->clk_gate);
 	}
 	return;
 }
 
 static int jz_pcm_probe(struct snd_soc_dai *dai)
 {
+	struct device *dev = dai->dev;
+
+	if (pcm_conf_info.pcm_device_mode == PCM_SLAVE) {
+		__pcm_as_slaver(dev);
+	} else {
+		__pcm_as_master(dev);
+		__pcm_set_clkdiv(dev, 9600000/20/8000 - 1);
+		__pcm_set_syndiv(dev, 20 - 1);
+	}
+
+	if ((pcm_conf_info.pcm_slot_num < 5) && (pcm_conf_info.pcm_slot_num > 0))
+		__pcm_set_slot(dev, ((pcm_conf_info.pcm_slot_num-1) & 0x3));
+	else
+		printk("pcm: slot num must be 1 2 3 or 4 .\n");
+
+	if (pcm_conf_info.pcm_imsb_pos == ONE_SHIFT_MODE)
+		__pcm_set_msb_one_shift_in(dev);
+	else
+		__pcm_set_msb_normal_in(dev);
+
+	if (pcm_conf_info.pcm_omsb_pos == ONE_SHIFT_MODE)
+		__pcm_set_msb_one_shift_out(dev);
+	else
+		__pcm_set_msb_normal_out(dev);
+
+	__pcm_set_receive_trigger(dev, 7);
+        __pcm_set_transmit_trigger(dev, 8);
+	__pcm_disable_overrun_intr(dev);
+        __pcm_disable_underrun_intr(dev);
+        __pcm_disable_transmit_intr(dev);
+        __pcm_disable_receive_intr(dev);
+	/* 
+         * Play zero sample when TX fifo underflow. 
+         * This is important for some external codec.
+         * If play last sample, here maybe a POP sound when adjust volume.
+         */
+	__pcm_play_zero(dev);
 	return 0;
 }
 
+static int jz_pcm_remove(struct snd_soc_dai *dai)
+{
+	return 0;
+}
 
 static struct snd_soc_dai_ops jz_pcm_dai_ops = {
 	.startup	= jz_pcm_startup,
@@ -277,22 +315,23 @@ static struct snd_soc_dai_driver jz_pcm_dai = {
 		.probe   = jz_pcm_probe,
 		.suspend = jz_pcm_suspend,
 		.resume  = jz_pcm_resume,
+		.remove  = jz_pcm_remove,
 		.playback = {
 			.channels_min = 1,
 			.channels_max = 1,
-			.rates = SNDRV_PCM_RATE_8000,
+			.rates = JZ_PCM_RATES,
 			.formats = JZ_PCM_FORMATS,
 		},
 		.capture = {
 			.channels_min = 1,
 			.channels_max = 1,
-			.rates = SNDRV_PCM_RATE_8000,
+			.rates = JZ_PCM_RATES,
 			.formats = JZ_PCM_FORMATS,
 		},
 		.ops = &jz_pcm_dai_ops,
 };
 
-static int jz_pcm_platfrom_probe(struct platform_device *pdev)
+static int jz_pcm_platform_probe(struct platform_device *pdev)
 {
 	struct jz_pcm *jz_pcm;
 	struct resource *res = NULL;
@@ -327,12 +366,17 @@ static int jz_pcm_platfrom_probe(struct platform_device *pdev)
 		jz_pcm->clk_gate = NULL;
 		return ret;
 	}
+	clk_enable(jz_pcm->clk_gate);
+
 	jz_pcm->clk = clk_get(&pdev->dev, "cgu_pcm");
 	if (IS_ERR_OR_NULL(jz_pcm->clk)) {
 		ret = PTR_ERR(jz_pcm->clk);
 		dev_err(&pdev->dev, "Failed to get clock: %d\n", ret);
 		goto err_get_clk;
 	}
+	clk_set_rate(jz_pcm->clk, 9600000);
+	clk_enable(jz_pcm->clk);
+
 	platform_set_drvdata(pdev, (void *)jz_pcm);
 
 	jz_pcm->pcm_mode = 0;
@@ -355,15 +399,17 @@ static int jz_pcm_platfrom_probe(struct platform_device *pdev)
 
 err_register_cpu_dai:
 	platform_set_drvdata(pdev, NULL);
+	clk_disable(jz_pcm->clk);
 	clk_put(jz_pcm->clk);
 	jz_pcm->clk = NULL;
 err_get_clk:
+	clk_disable(jz_pcm->clk_gate);
 	clk_put(jz_pcm->clk_gate);
 	jz_pcm->clk_gate = NULL;
 	return ret;
 }
 
-static int jz_pcm_platfom_remove(struct platform_device *pdev)
+static int jz_pcm_platform_remove(struct platform_device *pdev)
 {
 	struct jz_pcm *jz_pcm = platform_get_drvdata(pdev);
 	int i;
@@ -379,8 +425,8 @@ static int jz_pcm_platfom_remove(struct platform_device *pdev)
 }
 
 static struct platform_driver jz_pcm_plat_driver = {
-	.probe  = jz_pcm_platfrom_probe,
-	.remove = jz_pcm_platfom_remove,
+	.probe  = jz_pcm_platform_probe,
+	.remove = jz_pcm_platform_remove,
 	.driver = {
 		.name = "jz-asoc-pcm",
 		.owner = THIS_MODULE,

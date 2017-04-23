@@ -101,6 +101,7 @@ static void set_record_file_head()
 	set_wave_head(fd_amic, wave);
 	init_wave_head(wave, AEC_RATE, AEC_BIT, AEC_CHANNEL, 0);
 	set_wave_head(fd_dmic, wave);
+	free(wave);
 }
 #endif
 
@@ -122,6 +123,7 @@ static int soundcard_init(void)
 		.rates = AEC_RATE,
 		.channels = AEC_CHANNEL,
 		.volume = AEC_VOLUME,
+		.is_resample = true,
 	};
 
 	if (get_audio_type() == AUDIO_ALSA)
@@ -246,6 +248,10 @@ int mozart_aec_start(void)
 int mozart_aec_stop(void)
 {
 	aec_stop_flag = true;
+
+	while(aec_running == true) {
+		usleep(100*1000);
+	}
 
 	return 0;
 }

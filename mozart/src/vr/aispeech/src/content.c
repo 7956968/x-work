@@ -128,13 +128,13 @@ void _content_stop(void){
 
 void *content_wait_func(void *arg)
 {
-	int timeout = CONTENT_TIMEOUT * 1000;
+	int timeout = CONTENT_TIMEOUT * 10;
 	int timeused = 0;
 
 	pthread_detach(pthread_self());
 
-    while (is_end_flag == false && is_work_flag == true) {
-        usleep(1000);
+    while (is_end_flag == false) {
+        usleep(100000);
 		timeused++;
 		if (timeused > timeout) {
 			PERROR("ERROR: get content timeout!\n");
@@ -163,7 +163,6 @@ int content_get(char *text){
 
 	json_object *request = NULL;
 	json_object *param = NULL;
-
 
 	if (ai_vr_callback == NULL) {
 		printf("ai_vr_callback is null\n");
@@ -198,13 +197,10 @@ int content_get(char *text){
 			uuid, _content_callback, &usrdata);
 	aiengine_stop(sds_agn);
 
-
 	if (pthread_create(&content_wait_pthread, NULL, content_wait_func, NULL)) {
 		PERROR("create content_wait_pthread error: %s.\n", strerror(errno));
 		return -1;
 	}
-
-	printf("bbbb\n");
 
 	if(param){
 		json_object_put(param);
@@ -224,16 +220,16 @@ void content_stop(void){
 
 void content_interrupt(void){
 	ai_mutex_lock();
-	if (is_work_flag == false)
-		goto out;
-	DEBUG("content interrupt\n");
+//	if (is_end_flag == true)
+//		goto out;
+//	DEBUG("content interrupt\n");
 		
 	_content_stop();
 	ai_vr_info.from    = VR_FROM_CONTENT;
 	ai_vr_info.content.state = CONTENT_INTERRUPT;
 	if (ai_vr_callback)
 		ai_vr_callback(&ai_vr_info);
-out:
+//out:
 	ai_mutex_unlock();
 }
 

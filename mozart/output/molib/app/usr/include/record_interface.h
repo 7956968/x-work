@@ -6,7 +6,7 @@ extern "C"{
 #endif
 
 #include "alsa/asoundlib.h"
-
+#include <stdbool.h>
 
 /**
  * @brief audio driver
@@ -61,6 +61,7 @@ typedef struct record_param {
          * @brief record volume: 0-100.
          */
         int volume;
+	bool is_resample;
 } record_param;
 
 /**
@@ -144,6 +145,8 @@ extern int mozart_soundcard_aec_enable(aec_record *record, int time_delta_ms);
 extern int mozart_soundcard_aec_disable(aec_record *record);
 extern unsigned long  mozart_soundcard_aec_record(aec_record *record, char *loopback_buf,
 				char *dmic_buf, unsigned long len);
+unsigned long  mozart_soundcard_aec_record_time(aec_record *record, char *loopback_buf,
+					   char *dmic_buf, unsigned int time);
 extern int mozart_soundcard_dmic_gain_auto_control(mic_record *record, void *buff, int size);
 #ifdef __cplusplus
 }

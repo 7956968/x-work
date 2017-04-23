@@ -47,6 +47,14 @@ extern "C" {
 		 * @brief goto ASR mode
 		 */
 		VR_TO_ASR,
+		/**
+		 * @brief goto ASR dialogue mode
+		 */
+		VR_TO_ASR_SDS,
+		/**
+		 * @brief goto wait mode
+		 */
+		VR_TO_WAIT,
 	} vr_target_t;
 
 	/**
@@ -76,11 +84,29 @@ extern "C" {
 	 */
 	extern int mozart_vr_init(mozart_vr_callback callback);
 	/**
+	 * @brief set fast aec wakeup mode
+	 */
+	extern void mozart_vr_set_fast_aec_wakeup_mode(bool fast);
+	/**
 	 * @brief enter vr(aec) mode
 	 *
 	 * @return return 0 on success, return -1 otherwise.
 	 */
 	extern int mozart_vr_start(void);
+	/**
+	 * @brief enter aec mode
+	 *
+	 * @return return 0 on success, return -1 otherwise.
+	 */
+	extern int mozart_vr_enter_aec(void);
+	/**
+	 * @brief enter asr mode
+	 *
+	 * @param sds [in] whether is dialogue.
+	 *
+	 * @return return 0 on success, return -1 otherwise.
+	 */
+	extern int mozart_vr_enter_asr(bool sds);
 	/**
 	 * @brief exit vr mode, will not destory engine.
 	 *
@@ -133,7 +159,11 @@ extern "C" {
 	 * @return return /tmp/ai_tts.mp3 if success, return NULL otherwise.
 	 */
 	extern char *mozart_aispeech_tts(char *word);
-
+	/**
+	 * @brief stop aispeech tts
+	 *
+	 */
+	extern void mozart_aispeech_tts_stop(void);
 #ifdef __cplusplus
 }
 #endif

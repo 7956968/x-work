@@ -55,7 +55,7 @@ int in_depend_network_playmode();
 int set_switch_souce_snd();
 int get_switch_souce_snd();
 int handle_switch_souce_snd();
-int interrupt_contentget_and_vrasr();
+int interrupt_vrasr();
 
 
 #define safe_free(p) do{\

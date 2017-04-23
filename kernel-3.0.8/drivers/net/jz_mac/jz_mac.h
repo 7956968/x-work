@@ -98,6 +98,9 @@ struct jz_mac_local {
 	int old_speed;
 	int old_duplex;
 
+	/* GMIIAddressRegister.CR[5:2] */
+	u32 phymdc_csr;
+
 	struct phy_device *phydev;
 	struct mii_bus *mii_bus;
 
@@ -107,4 +110,4 @@ struct jz_mac_local {
 	struct mii_if_info mii;
 };
 
-#endif	/* __JZ4755_MAC_H__ */
+#endif	/* __JZ_MAC_H__ */
