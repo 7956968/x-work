@@ -272,8 +272,9 @@ int mozart_musicplayer_play_shortcut(musicplayer_handler_t *handler, int index)
 	}
 
 	sprintf(shortcut_name, "shortcut_%d", index);
-	mozart_ingenicplayer_notify_play_shortcut(shortcut_name);
+	//hzb fix dead lock
 	musicplayer_unlock(&musicplayer_mutex);
+	mozart_ingenicplayer_notify_play_shortcut(shortcut_name);
 
 	return 0;
 }

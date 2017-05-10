@@ -19,7 +19,7 @@
 #include "dm6291_led.h"
 #include "sharememory_interface.h"
 
-/* #define MOZART_INGENICPLAYER_DEBUG */
+ #define MOZART_INGENICPLAYER_DEBUG 
 #ifdef MOZART_INGENICPLAYER_DEBUG
 #define pr_debug(fmt, args...)				\
 	printf("[INGENICPLAYER] %s %d: "fmt, __func__, __LINE__, ##args)
@@ -498,6 +498,7 @@ static char *ingenicplayer_replace_queue(char *data, struct appserver_cli_info *
 
 	if (json_object_object_get_ex(cmd_object, "songs", &songs))
 		length = json_object_array_length(songs);
+	mozart_musicplayer_musiclist_clean(mozart_musicplayer_handler);
 
 	for (i = 0; i < length ; i++) {
 		array = json_object_array_get_idx(songs, i);

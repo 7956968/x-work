@@ -731,8 +731,7 @@ void keyevent_callback(mozart_event event, void *param)
 					set_switch_souce_snd();
 				break;
 			case KEY_F3:            /* music music Shortcut key 1 */
-				//HZB comment this statement because it will cause dead lock
-				//mozart_music_list(0);
+				mozart_music_list(1);
 				break;
 			case KEY_F4:            /* music music Shortcut key 2 */
 				mozart_music_list(1);
